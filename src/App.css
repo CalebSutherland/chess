@@ -5,4 +5,25 @@
 }
 
 #root {
+  padding: 2rem;
+}
+
+.square {
+  flex: 1 1 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  width: 30rem;
+  aspect-ratio: 1 / 1;
+  border: 1px solid black;
+}
+
+.row {
+  display: flex;
+  flex: 1 1 0;
 }
