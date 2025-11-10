@@ -1,11 +1,72 @@
 import { useEffect, useState } from "react";
-import type { Board, Piece, Position } from "../types/chess_types";
+import type {
+  Board,
+  Color,
+  Piece,
+  PieceType,
+  Position,
+} from "../types/chess_types";
 import { generate_moves } from "../game/game_logic";
 import "./Chess.css";
 
+import whitePawn from "../assets/pieces/white/pawn.svg";
+import whiteBishop from "../assets/pieces/white/bishop.svg";
+import whiteKnight from "../assets/pieces/white/knight.svg";
+import whiteRook from "../assets/pieces/white/rook.svg";
+import whiteQueen from "../assets/pieces/white/queen.svg";
+import whiteKing from "../assets/pieces/white/king.svg";
+import blackPawn from "../assets/pieces/black/pawn.svg";
+import blackBishop from "../assets/pieces/black/bishop.svg";
+import blackKnight from "../assets/pieces/black/knight.svg";
+import blackRook from "../assets/pieces/black/rook.svg";
+import blackQueen from "../assets/pieces/black/queen.svg";
+import blackKing from "../assets/pieces/black/king.svg";
+
+const pieceIcons: Record<PieceType, Record<Color, string>> = {
+  king: { white: whiteKing, black: blackKing },
+  queen: { white: whiteQueen, black: blackQueen },
+  rook: { white: whiteRook, black: blackRook },
+  bishop: { white: whiteBishop, black: blackBishop },
+  knight: { white: whiteKnight, black: blackKnight },
+  pawn: { white: whitePawn, black: blackPawn },
+};
+
+const initialBoard: Board = [
+  [
+    { type: "rook", color: "black" },
+    { type: "knight", color: "black" },
+    { type: "bishop", color: "black" },
+    { type: "queen", color: "black" },
+    { type: "king", color: "black" },
+    { type: "bishop", color: "black" },
+    { type: "knight", color: "black" },
+    { type: "rook", color: "black" },
+  ],
+  Array(8)
+    .fill(null)
+    .map(() => ({ type: "pawn", color: "black" })),
+  Array(8).fill(null),
+  Array(8).fill(null),
+  Array(8).fill(null),
+  Array(8).fill(null),
+  Array(8)
+    .fill(null)
+    .map(() => ({ type: "pawn", color: "white" })),
+  [
+    { type: "rook", color: "white" },
+    { type: "knight", color: "white" },
+    { type: "bishop", color: "white" },
+    { type: "queen", color: "white" },
+    { type: "king", color: "white" },
+    { type: "bishop", color: "white" },
+    { type: "knight", color: "white" },
+    { type: "rook", color: "white" },
+  ],
+];
+
 interface BoardSquareProps {
   color: string;
-  piece: Piece | null;
+  piece: string | null;
   isSelected: boolean;
   highlight?: boolean;
   handleSquareClick: () => void;
@@ -29,7 +90,7 @@ function BoardSquare({
       style={{ backgroundColor: color, border: border }}
       onClick={handleSquareClick}
     >
-      {piece && <p>P</p>}
+      {piece && <img src={piece}></img>}
     </div>
   );
 }
@@ -50,17 +111,18 @@ function BoardDisplay({
     <div className="board">
       {board.map((row, r) =>
         row.map((_, c) => {
+          const color = (r + c) % 2 === 0 ? "#edce8a" : "#720a0a";
           const isSelected = selected?.[0] === r && selected?.[1] === c;
-          const color = (r + c) % 2 === 0 ? "#edce8a" : "#350901";
-
           const highlight = validMoves?.some(
             (move) => move[0] === r && move[1] === c
           );
+          const piece = board[r][c];
+          const pieceIcon = piece ? pieceIcons[piece.type][piece.color] : null;
 
           return (
             <BoardSquare
               key={`${r}-${c}`}
-              piece={board[r][c]}
+              piece={pieceIcon}
               color={color}
               isSelected={isSelected}
               highlight={highlight}
@@ -73,9 +135,7 @@ function BoardDisplay({
   );
 }
 export default function Chess() {
-  const [board, setBoard] = useState<Board>(
-    Array.from({ length: 8 }, () => Array(8).fill(null))
-  );
+  const [board, setBoard] = useState<Board>(initialBoard);
   const [selected, setSelected] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[] | null>(null);
 
@@ -108,21 +168,14 @@ export default function Chess() {
     }
   };
 
-  useEffect(() => {
-    setBoard((prev) => {
-      const newBoard = prev.map((row) => [...row]);
-      newBoard[6][6] = { type: "pawn", color: "white" };
-      newBoard[1][7] = { type: "pawn", color: "black" };
-      return newBoard;
-    });
-  }, []);
-
-  useEffect(() => {
-    console.log(validMoves);
-  }, [validMoves]);
-
-  //   const moves = generate_moves(6, 6, { type: "pawn", color: "white" }, board);
-  //   console.log(moves);
+  // useEffect(() => {
+  //   setBoard((prev) => {
+  //     const newBoard = prev.map((row) => [...row]);
+  //     newBoard[6][6] = { type: "rook", color: "white" };
+  //     newBoard[6][5] = { type: "queen", color: "white" };
+  //     return newBoard;
+  //   });
+  // }, []);
 
   return (
     <div>

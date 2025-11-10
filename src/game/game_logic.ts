@@ -39,11 +39,85 @@ export const generate_moves = (
         }
       }
 
+      // check diagnols
       [-1, 1].forEach((dc) => {
         const target = board[row + direction]?.[col + dc];
         if (target && target.color !== color) {
           moves.push([row + direction, col + dc]);
         }
+      });
+      break;
+
+    case "rook":
+      [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ].forEach(([dr, dc]) => {
+        for (let i = 1; i < 8; i++) {
+          if (!addMove(row + dr * i, col + dc * i)) break;
+        }
+      });
+      break;
+
+    case "bishop":
+      [
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ].forEach(([dr, dc]) => {
+        for (let i = 1; i < 8; i++) {
+          if (!addMove(row + dr * i, col + dc * i)) break;
+        }
+      });
+      break;
+
+    case "queen":
+      [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ].forEach(([dr, dc]) => {
+        for (let i = 1; i < 8; i++) {
+          if (!addMove(row + dr * i, col + dc * i)) break;
+        }
+      });
+      break;
+
+    case "knight":
+      [
+        [2, 1],
+        [2, -1],
+        [-2, 1],
+        [-2, -1],
+        [1, 2],
+        [1, -2],
+        [-1, 2],
+        [-1, -2],
+      ].forEach(([dr, dc]) => {
+        addMove(row + dr, col + dc);
+      });
+      break;
+
+    case "king":
+      [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ].forEach(([dr, dc]) => {
+        addMove(row + dr, col + dc);
       });
       break;
   }
