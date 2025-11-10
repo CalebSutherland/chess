@@ -1,0 +1,20 @@
+.square {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.square p {
+  color: red;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 30rem;
+  aspect-ratio: 1 / 1;
+  border: 1px solid black;
+}
