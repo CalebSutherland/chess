@@ -1,13 +1,12 @@
 .square {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.square p {
-  color: red;
-  font-size: 24px;
-  font-weight: bold;
+.square img.piece {
+  z-index: 1;
 }
 
 .board {
@@ -17,4 +16,22 @@
   width: 30rem;
   aspect-ratio: 1 / 1;
   border: 1px solid black;
+}
+
+.square.last_move::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: #d7e20ba2;
+  z-index: 0;
+}
+
+.highlight-dot {
+  position: absolute;
+  width: 25%;
+  height: 25%;
+  border-radius: 50%;
+  background-color: #000000af;
+  z-index: 2;
+  pointer-events: none;
 }

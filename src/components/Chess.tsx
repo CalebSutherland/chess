@@ -67,30 +67,25 @@ const initialBoard: Board = [
 interface BoardSquareProps {
   color: string;
   piece: string | null;
-  isSelected: boolean;
   highlight?: boolean;
+  lastMove?: boolean;
   handleSquareClick: () => void;
 }
 function BoardSquare({
   color,
   piece,
-  isSelected,
   highlight,
+  lastMove,
   handleSquareClick,
 }: BoardSquareProps) {
-  let border = "";
-  if (isSelected) {
-    border = "4px solid blue";
-  } else if (highlight) {
-    border = "4px solid red";
-  }
   return (
     <div
-      className="square"
-      style={{ backgroundColor: color, border: border }}
+      className={`square ${lastMove ? "last_move" : ""}`}
+      style={{ backgroundColor: color }}
       onClick={handleSquareClick}
     >
-      {piece && <img src={piece}></img>}
+      {piece && <img src={piece} alt="chess piece" className="piece" />}
+      {highlight && <div className="highlight-dot"></div>}
     </div>
   );
 }
@@ -99,21 +94,30 @@ interface BoardDisplayProps {
   board: Board;
   selected: Position | null;
   validMoves: Position[] | null;
+  lastMove: [Position, Position] | null;
   handleSquareClick: (position: Position) => void;
 }
 function BoardDisplay({
   board,
   selected,
   validMoves,
+  lastMove,
   handleSquareClick,
 }: BoardDisplayProps) {
   return (
     <div className="board">
       {board.map((row, r) =>
         row.map((_, c) => {
-          const color = (r + c) % 2 === 0 ? "#edce8a" : "#720a0a";
           const isSelected = selected?.[0] === r && selected?.[1] === c;
-          const highlight = validMoves?.some(
+          const color = isSelected
+            ? "yellow"
+            : (r + c) % 2 === 0
+            ? "#edce8a"
+            : "#720a0a";
+          const isHighlight = validMoves?.some(
+            (move) => move[0] === r && move[1] === c
+          );
+          const isLastMove = lastMove?.some(
             (move) => move[0] === r && move[1] === c
           );
           const piece = board[r][c];
@@ -124,8 +128,8 @@ function BoardDisplay({
               key={`${r}-${c}`}
               piece={pieceIcon}
               color={color}
-              isSelected={isSelected}
-              highlight={highlight}
+              highlight={isHighlight}
+              lastMove={isLastMove}
               handleSquareClick={() => handleSquareClick([r, c])}
             />
           );
@@ -134,36 +138,43 @@ function BoardDisplay({
     </div>
   );
 }
+
 export default function Chess() {
   const [board, setBoard] = useState<Board>(initialBoard);
   const [selected, setSelected] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[] | null>(null);
+  const [lastMove, setLastMove] = useState<[Position, Position] | null>(null);
 
   const handleSquareClick = (position: Position) => {
     const row = position[0];
     const col = position[1];
 
-    if (selected && board[selected[0]][selected[1]]) {
-      const valid = validMoves?.some(
-        (move) => move[0] === row && move[1] === col
-      );
-      if (valid) {
-        setBoard((prev) => {
-          const newBoard = prev.map((row) => [...row]);
-          newBoard[row][col] = prev[selected[0]][selected[1]];
-          newBoard[selected[0]][selected[1]] = null;
-          return newBoard;
-        });
-        setSelected(null);
-        setValidMoves(null);
-        return;
-      }
+    // if piece selected and valid move
+    if (
+      selected &&
+      validMoves?.some((move) => move[0] === row && move[1] === col)
+    ) {
+      setBoard((prev) => {
+        const newBoard = prev.map((row) => [...row]);
+        newBoard[row][col] = prev[selected[0]][selected[1]];
+        newBoard[selected[0]][selected[1]] = null;
+        return newBoard;
+      });
+      setSelected(null);
+      setValidMoves(null);
+      setLastMove([
+        [row, col],
+        [selected[0], selected[1]],
+      ]);
+      return;
     }
-    setSelected(position);
-    if (board[row][col]) {
+    // if theres a peice at this position
+    else if (board[row][col]) {
+      setSelected(position);
       const moves = generate_moves(row, col, board[row][col], board);
       setValidMoves(moves);
     } else {
+      setSelected(null);
       setValidMoves(null);
     }
   };
@@ -183,6 +194,7 @@ export default function Chess() {
         board={board}
         selected={selected}
         validMoves={validMoves}
+        lastMove={lastMove}
         handleSquareClick={handleSquareClick}
       />
     </div>
