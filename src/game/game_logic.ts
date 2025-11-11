@@ -1,10 +1,10 @@
-import type { Board, Piece, Position } from "../types/chess_types";
+import type { Board, Color, Piece, Position } from "../types/chess_types";
 
 const isValidPosition = (row: number, col: number) => {
   return row >= 0 && row < 8 && col >= 0 && col < 8;
 };
 
-export const generate_moves = (
+export const generateMoves = (
   row: number,
   col: number,
   piece: Piece,
@@ -39,7 +39,7 @@ export const generate_moves = (
         }
       }
 
-      // check diagnols
+      // check if pawn can attack diagnols
       [-1, 1].forEach((dc) => {
         const target = board[row + direction]?.[col + dc];
         if (target && target.color !== color) {
@@ -122,4 +122,40 @@ export const generate_moves = (
       break;
   }
   return moves;
+};
+
+export const findKingPos = (kingColor: Color, board: Board) => {
+  let kingPos: Position | null = null;
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (piece?.type === "king" && piece.color === kingColor) {
+        kingPos = [r, c];
+        break;
+      }
+    }
+    if (kingPos) break;
+  }
+  return kingPos;
+};
+
+export const isInCheck = (kingColor: Color, board: Board) => {
+  const kingPos = findKingPos(kingColor, board);
+
+  // check all oppenent pieces moves and see if they attack the king
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (piece && piece.color !== kingColor) {
+        const moves = generateMoves(r, c, piece, board);
+        if (
+          moves.some(([mr, mc]) => mr === kingPos![0] && mc === kingPos![1])
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 };

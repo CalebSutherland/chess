@@ -6,7 +6,7 @@ import type {
   PieceType,
   Position,
 } from "../types/chess_types";
-import { generate_moves } from "../game/game_logic";
+import { findKingPos, generateMoves, isInCheck } from "../game/game_logic";
 import "./Chess.css";
 
 import whitePawn from "../assets/pieces/white/pawn.svg";
@@ -69,6 +69,7 @@ interface BoardSquareProps {
   piece: string | null;
   highlight?: boolean;
   lastMove?: boolean;
+  inCheck?: boolean;
   handleSquareClick: () => void;
 }
 function BoardSquare({
@@ -76,11 +77,14 @@ function BoardSquare({
   piece,
   highlight,
   lastMove,
+  inCheck,
   handleSquareClick,
 }: BoardSquareProps) {
   return (
     <div
-      className={`square ${lastMove ? "last_move" : ""}`}
+      className={`square ${lastMove ? "last_move" : ""} ${
+        inCheck ? "check" : ""
+      }`}
       style={{ backgroundColor: color }}
       onClick={handleSquareClick}
     >
@@ -95,6 +99,8 @@ interface BoardDisplayProps {
   selected: Position | null;
   validMoves: Position[] | null;
   lastMove: [Position, Position] | null;
+  currentTurn: Color;
+  inCheck: Color | null;
   handleSquareClick: (position: Position) => void;
 }
 function BoardDisplay({
@@ -102,8 +108,14 @@ function BoardDisplay({
   selected,
   validMoves,
   lastMove,
+  currentTurn,
+  inCheck,
   handleSquareClick,
 }: BoardDisplayProps) {
+  let kingPos: Position | null = null;
+  if (inCheck) {
+    kingPos = findKingPos(currentTurn, board);
+  }
   return (
     <div className="board">
       {board.map((row, r) =>
@@ -120,6 +132,9 @@ function BoardDisplay({
           const isLastMove = lastMove?.some(
             (move) => move[0] === r && move[1] === c
           );
+          const kingInCheck = kingPos
+            ? kingPos[0] === r && kingPos[1] === c
+            : false;
           const piece = board[r][c];
           const pieceIcon = piece ? pieceIcons[piece.type][piece.color] : null;
 
@@ -130,6 +145,7 @@ function BoardDisplay({
               color={color}
               highlight={isHighlight}
               lastMove={isLastMove}
+              inCheck={kingInCheck}
               handleSquareClick={() => handleSquareClick([r, c])}
             />
           );
@@ -144,6 +160,8 @@ export default function Chess() {
   const [selected, setSelected] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[] | null>(null);
   const [lastMove, setLastMove] = useState<[Position, Position] | null>(null);
+  const [currentTurn, setCurrentTurn] = useState<Color>("white");
+  const [inCheck, setInCheck] = useState<Color | null>(null);
 
   const handleSquareClick = (position: Position) => {
     const row = position[0];
@@ -154,12 +172,23 @@ export default function Chess() {
       selected &&
       validMoves?.some((move) => move[0] === row && move[1] === col)
     ) {
-      setBoard((prev) => {
-        const newBoard = prev.map((row) => [...row]);
-        newBoard[row][col] = prev[selected[0]][selected[1]];
-        newBoard[selected[0]][selected[1]] = null;
-        return newBoard;
-      });
+      const newBoard = board.map((row) => [...row]);
+      newBoard[row][col] = board[selected[0]][selected[1]];
+      newBoard[selected[0]][selected[1]] = null;
+
+      if (!isInCheck(currentTurn, newBoard)) {
+        setBoard(newBoard);
+        const nextTurn = currentTurn === "white" ? "black" : "white";
+
+        if (isInCheck(nextTurn, newBoard)) {
+          setInCheck(nextTurn);
+        } else {
+          setInCheck(null);
+        }
+
+        setCurrentTurn(nextTurn);
+      }
+
       setSelected(null);
       setValidMoves(null);
       setLastMove([
@@ -168,33 +197,35 @@ export default function Chess() {
       ]);
       return;
     }
-    // if theres a peice at this position
-    else if (board[row][col]) {
+    // if theres a correct color peice at this position
+    else if (board[row][col] && board[row][col].color === currentTurn) {
       setSelected(position);
-      const moves = generate_moves(row, col, board[row][col], board);
-      setValidMoves(moves);
+      const moves = generateMoves(row, col, board[row][col], board);
+      // find moves that dont put king in check
+      const legalMoves = moves.filter(([mr, mc]) => {
+        const testBoard = board.map((r) => [...r]);
+        testBoard[mr][mc] = testBoard[row][col];
+        testBoard[row][col] = null;
+        return !isInCheck(currentTurn, testBoard);
+      });
+      setValidMoves(legalMoves);
     } else {
       setSelected(null);
       setValidMoves(null);
     }
   };
 
-  // useEffect(() => {
-  //   setBoard((prev) => {
-  //     const newBoard = prev.map((row) => [...row]);
-  //     newBoard[6][6] = { type: "rook", color: "white" };
-  //     newBoard[6][5] = { type: "queen", color: "white" };
-  //     return newBoard;
-  //   });
-  // }, []);
-
   return (
-    <div>
+    <div className="chess">
+      <p>Turn: {currentTurn}</p>
+      <p>Check: {inCheck}</p>
       <BoardDisplay
         board={board}
         selected={selected}
         validMoves={validMoves}
         lastMove={lastMove}
+        currentTurn={currentTurn}
+        inCheck={inCheck}
         handleSquareClick={handleSquareClick}
       />
     </div>
