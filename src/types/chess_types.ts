@@ -10,6 +10,7 @@ export type Color = "white" | "black";
 export interface Piece {
   type: PieceType;
   color: Color;
+  hasMoved: boolean;
 }
 
 export type Board = (Piece | null)[][];

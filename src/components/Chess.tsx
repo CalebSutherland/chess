@@ -1,11 +1,5 @@
-import { useEffect, useState } from "react";
-import type {
-  Board,
-  Color,
-  Piece,
-  PieceType,
-  Position,
-} from "../types/chess_types";
+import { useState } from "react";
+import type { Board, Color, PieceType, Position } from "../types/chess_types";
 import {
   findKingPos,
   generateMoves,
@@ -38,14 +32,14 @@ const pieceIcons: Record<PieceType, Record<Color, string>> = {
 
 const initialBoard: Board = [
   [
-    { type: "rook", color: "black" },
-    { type: "knight", color: "black" },
-    { type: "bishop", color: "black" },
-    { type: "queen", color: "black" },
-    { type: "king", color: "black" },
-    { type: "bishop", color: "black" },
-    { type: "knight", color: "black" },
-    { type: "rook", color: "black" },
+    { type: "rook", color: "black", hasMoved: false },
+    { type: "knight", color: "black", hasMoved: false },
+    { type: "bishop", color: "black", hasMoved: false },
+    { type: "queen", color: "black", hasMoved: false },
+    { type: "king", color: "black", hasMoved: false },
+    { type: "bishop", color: "black", hasMoved: false },
+    { type: "knight", color: "black", hasMoved: false },
+    { type: "rook", color: "black", hasMoved: false },
   ],
   Array(8)
     .fill(null)
@@ -58,14 +52,14 @@ const initialBoard: Board = [
     .fill(null)
     .map(() => ({ type: "pawn", color: "white" })),
   [
-    { type: "rook", color: "white" },
-    { type: "knight", color: "white" },
-    { type: "bishop", color: "white" },
-    { type: "queen", color: "white" },
-    { type: "king", color: "white" },
-    { type: "bishop", color: "white" },
-    { type: "knight", color: "white" },
-    { type: "rook", color: "white" },
+    { type: "rook", color: "white", hasMoved: false },
+    { type: "knight", color: "white", hasMoved: false },
+    { type: "bishop", color: "white", hasMoved: false },
+    { type: "queen", color: "white", hasMoved: false },
+    { type: "king", color: "white", hasMoved: false },
+    { type: "bishop", color: "white", hasMoved: false },
+    { type: "knight", color: "white", hasMoved: false },
+    { type: "rook", color: "white", hasMoved: false },
   ],
 ];
 
@@ -183,8 +177,23 @@ export default function Chess() {
       const newBoard = board.map((row) => [...row]);
       const selectedPiece = board[selected[0]][selected[1]];
 
-      newBoard[row][col] = board[selected[0]][selected[1]];
+      newBoard[row][col] = { ...selectedPiece!, hasMoved: true };
       newBoard[selected[0]][selected[1]] = null;
+
+      // handle castling
+      if (selectedPiece?.type === "king" && Math.abs(col - selected[1]) === 2) {
+        const backRank = currentTurn === "white" ? 7 : 0;
+
+        if (col === 6) {
+          // Kingside castling - rook from h-file to f-file
+          newBoard[backRank][5] = { ...board[backRank][7]!, hasMoved: true };
+          newBoard[backRank][7] = null;
+        } else if (col === 2) {
+          // Queenside castling - rook from a-file to d-file
+          newBoard[backRank][3] = { ...board[backRank][0]!, hasMoved: true };
+          newBoard[backRank][0] = null;
+        }
+      }
 
       // handle en passant
       if (
@@ -216,8 +225,8 @@ export default function Chess() {
       setSelected(null);
       setValidMoves(null);
       setLastMove([
-        [row, col],
         [selected[0], selected[1]],
+        [row, col],
       ]);
       return;
     }
@@ -236,7 +245,7 @@ export default function Chess() {
           Math.abs(mc - col) === 1 &&
           !board[mr][mc]
         ) {
-          testBoard[row][mc] == null;
+          testBoard[row][mc] = null;
         }
         return !isInCheck(currentTurn, testBoard);
       });

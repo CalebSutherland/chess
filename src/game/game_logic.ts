@@ -4,13 +4,13 @@ const isValidPosition = (row: number, col: number) => {
   return row >= 0 && row < 8 && col >= 0 && col < 8;
 };
 
-export const generateMoves = (
+// Simplified move generation for attack checking (no special moves like castling/en passant)
+export const generateAttackMoves = (
   row: number,
   col: number,
   piece: Piece,
-  board: Board,
-  lastMove?: [Position, Position] | null
-) => {
+  board: Board
+): Position[] => {
   const moves: Position[] = [];
   const { type, color } = piece;
 
@@ -19,8 +19,6 @@ export const generateMoves = (
       return false;
     }
     const target = board[r][c];
-
-    // if empty sqaure or oppenent peice
     if (!target || target.color !== color) {
       moves.push([r, c]);
       return !target;
@@ -31,37 +29,16 @@ export const generateMoves = (
   switch (type) {
     case "pawn":
       const direction = color === "white" ? -1 : 1;
-      const startRow = color === "white" ? 6 : 1;
-      const enPassantRow = color === "white" ? 3 : 4;
-
-      if (!board[row + direction]?.[col]) {
-        moves.push([row + direction, col]);
-        if (row == startRow && !board[row + 2 * direction]?.[col]) {
-          moves.push([row + 2 * direction, col]);
-        }
-      }
-
-      // check if pawn can attack diagnols
+      // Only diagonal attacks for pawns
       [-1, 1].forEach((dc) => {
-        const target = board[row + direction]?.[col + dc];
-        if (target && target.color !== color) {
+        if (
+          isValidPosition(row + direction, col + dc) &&
+          board[row + direction][col + dc] &&
+          board[row + direction][col + dc]?.color != color
+        ) {
           moves.push([row + direction, col + dc]);
         }
       });
-
-      // check for en passant
-      if (row === enPassantRow && lastMove) {
-        const [lastTo, lastFrom] = lastMove;
-        const lastPiece = board[lastTo[0]][lastTo[1]];
-        if (
-          lastPiece?.type === "pawn" &&
-          Math.abs(lastFrom[0] - lastTo[0]) === 2 &&
-          lastTo[0] === row &&
-          Math.abs(lastTo[1] - col) === 1
-        ) {
-          moves.push([row + direction, lastTo[1]]);
-        }
-      }
       break;
 
     case "rook":
@@ -140,6 +117,112 @@ export const generateMoves = (
   return moves;
 };
 
+export const generateMoves = (
+  row: number,
+  col: number,
+  piece: Piece,
+  board: Board,
+  lastMove?: [Position, Position] | null
+) => {
+  const moves = generateAttackMoves(row, col, piece, board);
+  const { type, color } = piece;
+
+  switch (type) {
+    case "pawn":
+      const direction = color === "white" ? -1 : 1;
+      const startRow = color === "white" ? 6 : 1;
+      const enPassantRow = color === "white" ? 3 : 4;
+
+      // Forward movement (not in attack moves)
+      if (!board[row + direction]?.[col]) {
+        moves.push([row + direction, col]);
+        if (row === startRow && !board[row + 2 * direction]?.[col]) {
+          moves.push([row + 2 * direction, col]);
+        }
+      }
+
+      // En passant (already have diagonal attacks from generateAttackMoves)
+      if (row === enPassantRow && lastMove) {
+        const [lastFrom, lastTo] = lastMove;
+        const lastPiece = board[lastTo[0]][lastTo[1]];
+        if (
+          lastPiece?.type === "pawn" &&
+          Math.abs(lastFrom[0] - lastTo[0]) === 2 &&
+          lastTo[0] === row &&
+          Math.abs(lastTo[1] - col) === 1
+        ) {
+          moves.push([row + direction, lastTo[1]]);
+        }
+      }
+      break;
+
+    case "king":
+      // Castling (regular king moves already added by generateAttackMoves)
+      if (!piece.hasMoved) {
+        const backRank = color === "white" ? 7 : 0;
+
+        // Check king is not currently in check
+        if (!isSquareUnderAttack(row, col, color, board)) {
+          // Kingside castling
+          const kingsideRook = board[backRank][7];
+          if (
+            kingsideRook?.type === "rook" &&
+            kingsideRook.color === color &&
+            !kingsideRook.hasMoved &&
+            !board[backRank][5] &&
+            !board[backRank][6] &&
+            !isSquareUnderAttack(backRank, 5, color, board) &&
+            !isSquareUnderAttack(backRank, 6, color, board)
+          ) {
+            moves.push([backRank, 6]);
+          }
+
+          // Queenside castling
+          const queensideRook = board[backRank][0];
+          if (
+            queensideRook?.type === "rook" &&
+            queensideRook.color === color &&
+            !queensideRook.hasMoved &&
+            !board[backRank][1] &&
+            !board[backRank][2] &&
+            !board[backRank][3] &&
+            !isSquareUnderAttack(backRank, 3, color, board) &&
+            !isSquareUnderAttack(backRank, 2, color, board)
+          ) {
+            moves.push([backRank, 2]);
+          }
+        }
+      }
+      break;
+
+    default:
+      break;
+  }
+  return moves;
+};
+
+export const isSquareUnderAttack = (
+  row: number,
+  col: number,
+  defendingColor: Color,
+  board: Board
+): boolean => {
+  const attackingColor = defendingColor === "white" ? "black" : "white";
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (piece && piece.color === attackingColor) {
+        const moves = generateAttackMoves(r, c, piece, board);
+        if (moves.some(([mr, mc]) => mr === row && mc === col)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+};
+
 export const findKingPos = (kingColor: Color, board: Board) => {
   let kingPos: Position | null = null;
 
@@ -156,28 +239,11 @@ export const findKingPos = (kingColor: Color, board: Board) => {
   return kingPos;
 };
 
-export const isInCheck = (
-  kingColor: Color,
-  board: Board,
-  lastMove?: [Position, Position] | null
-) => {
+export const isInCheck = (kingColor: Color, board: Board) => {
   const kingPos = findKingPos(kingColor, board);
+  if (!kingPos) return false;
 
-  // check all oppenent pieces moves and see if they attack the king
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      const piece = board[r][c];
-      if (piece && piece.color !== kingColor) {
-        const moves = generateMoves(r, c, piece, board, lastMove);
-        if (
-          moves.some(([mr, mc]) => mr === kingPos![0] && mc === kingPos![1])
-        ) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
+  return isSquareUnderAttack(kingPos[0], kingPos[1], kingColor, board);
 };
 
 export const isCheckmate = (
