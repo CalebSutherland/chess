@@ -6,7 +6,12 @@ import type {
   PieceType,
   Position,
 } from "../types/chess_types";
-import { findKingPos, generateMoves, isInCheck } from "../game/game_logic";
+import {
+  findKingPos,
+  generateMoves,
+  isCheckmate,
+  isInCheck,
+} from "../game/game_logic";
 import "./Chess.css";
 
 import whitePawn from "../assets/pieces/white/pawn.svg";
@@ -162,8 +167,11 @@ export default function Chess() {
   const [lastMove, setLastMove] = useState<[Position, Position] | null>(null);
   const [currentTurn, setCurrentTurn] = useState<Color>("white");
   const [inCheck, setInCheck] = useState<Color | null>(null);
+  const [checkMate, setCheckmate] = useState(false);
 
   const handleSquareClick = (position: Position) => {
+    if (checkMate) return;
+
     const row = position[0];
     const col = position[1];
 
@@ -173,15 +181,31 @@ export default function Chess() {
       validMoves?.some((move) => move[0] === row && move[1] === col)
     ) {
       const newBoard = board.map((row) => [...row]);
+      const selectedPiece = board[selected[0]][selected[1]];
+
       newBoard[row][col] = board[selected[0]][selected[1]];
       newBoard[selected[0]][selected[1]] = null;
 
+      // handle en passant
+      if (
+        selectedPiece?.type === "pawn" &&
+        Math.abs(col - selected[1]) === 1 &&
+        !board[row][col]
+      ) {
+        newBoard[selected[0]][col] = null;
+      }
+
+      // if the move doesnt put them in check
       if (!isInCheck(currentTurn, newBoard)) {
         setBoard(newBoard);
         const nextTurn = currentTurn === "white" ? "black" : "white";
 
         if (isInCheck(nextTurn, newBoard)) {
           setInCheck(nextTurn);
+
+          if (isCheckmate(nextTurn, newBoard, lastMove)) {
+            setCheckmate(true);
+          }
         } else {
           setInCheck(null);
         }
@@ -200,12 +224,20 @@ export default function Chess() {
     // if theres a correct color peice at this position
     else if (board[row][col] && board[row][col].color === currentTurn) {
       setSelected(position);
-      const moves = generateMoves(row, col, board[row][col], board);
+      const moves = generateMoves(row, col, board[row][col], board, lastMove);
       // find moves that dont put king in check
       const legalMoves = moves.filter(([mr, mc]) => {
         const testBoard = board.map((r) => [...r]);
-        testBoard[mr][mc] = testBoard[row][col];
+        const movingPiece = testBoard[row][col];
+        testBoard[mr][mc] = movingPiece;
         testBoard[row][col] = null;
+        if (
+          movingPiece?.type === "pawn" &&
+          Math.abs(mc - col) === 1 &&
+          !board[mr][mc]
+        ) {
+          testBoard[row][mc] == null;
+        }
         return !isInCheck(currentTurn, testBoard);
       });
       setValidMoves(legalMoves);
@@ -219,6 +251,9 @@ export default function Chess() {
     <div className="chess">
       <p>Turn: {currentTurn}</p>
       <p>Check: {inCheck}</p>
+      {checkMate && (
+        <p>Checkmate! {currentTurn === "white" ? "black" : "white"} wins!</p>
+      )}
       <BoardDisplay
         board={board}
         selected={selected}

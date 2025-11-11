@@ -8,7 +8,8 @@ export const generateMoves = (
   row: number,
   col: number,
   piece: Piece,
-  board: Board
+  board: Board,
+  lastMove?: [Position, Position] | null
 ) => {
   const moves: Position[] = [];
   const { type, color } = piece;
@@ -31,6 +32,7 @@ export const generateMoves = (
     case "pawn":
       const direction = color === "white" ? -1 : 1;
       const startRow = color === "white" ? 6 : 1;
+      const enPassantRow = color === "white" ? 3 : 4;
 
       if (!board[row + direction]?.[col]) {
         moves.push([row + direction, col]);
@@ -46,6 +48,20 @@ export const generateMoves = (
           moves.push([row + direction, col + dc]);
         }
       });
+
+      // check for en passant
+      if (row === enPassantRow && lastMove) {
+        const [lastTo, lastFrom] = lastMove;
+        const lastPiece = board[lastTo[0]][lastTo[1]];
+        if (
+          lastPiece?.type === "pawn" &&
+          Math.abs(lastFrom[0] - lastTo[0]) === 2 &&
+          lastTo[0] === row &&
+          Math.abs(lastTo[1] - col) === 1
+        ) {
+          moves.push([row + direction, lastTo[1]]);
+        }
+      }
       break;
 
     case "rook":
@@ -140,7 +156,11 @@ export const findKingPos = (kingColor: Color, board: Board) => {
   return kingPos;
 };
 
-export const isInCheck = (kingColor: Color, board: Board) => {
+export const isInCheck = (
+  kingColor: Color,
+  board: Board,
+  lastMove?: [Position, Position] | null
+) => {
   const kingPos = findKingPos(kingColor, board);
 
   // check all oppenent pieces moves and see if they attack the king
@@ -148,7 +168,7 @@ export const isInCheck = (kingColor: Color, board: Board) => {
     for (let c = 0; c < 8; c++) {
       const piece = board[r][c];
       if (piece && piece.color !== kingColor) {
-        const moves = generateMoves(r, c, piece, board);
+        const moves = generateMoves(r, c, piece, board, lastMove);
         if (
           moves.some(([mr, mc]) => mr === kingPos![0] && mc === kingPos![1])
         ) {
@@ -158,4 +178,28 @@ export const isInCheck = (kingColor: Color, board: Board) => {
     }
   }
   return false;
+};
+
+export const isCheckmate = (
+  kingColor: Color,
+  board: Board,
+  lastMove: [Position, Position] | null
+) => {
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (piece && piece.color === kingColor) {
+        const moves = generateMoves(r, c, piece, board, lastMove);
+        for (const [mr, mc] of moves) {
+          const newBoard = board.map((row) => [...row]);
+          newBoard[mr][mc] = newBoard[r][c];
+          newBoard[r][c] = null;
+          if (!isInCheck(kingColor, newBoard)) {
+            return false;
+          }
+        }
+      }
+    }
+  }
+  return true;
 };
