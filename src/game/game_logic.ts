@@ -4,7 +4,7 @@ const isValidPosition = (row: number, col: number) => {
   return row >= 0 && row < 8 && col >= 0 && col < 8;
 };
 
-// Simplified move generation for attack checking (no special moves like castling/en passant)
+// checks what squares a piece attacks
 export const generateAttackMoves = (
   row: number,
   col: number,
@@ -117,6 +117,7 @@ export const generateAttackMoves = (
   return moves;
 };
 
+// generates all legal moves a piece can make
 export const generateMoves = (
   row: number,
   col: number,
@@ -133,7 +134,7 @@ export const generateMoves = (
       const startRow = color === "white" ? 6 : 1;
       const enPassantRow = color === "white" ? 3 : 4;
 
-      // Forward movement (not in attack moves)
+      // forward movement
       if (!board[row + direction]?.[col]) {
         moves.push([row + direction, col]);
         if (row === startRow && !board[row + 2 * direction]?.[col]) {
@@ -141,7 +142,7 @@ export const generateMoves = (
         }
       }
 
-      // En passant (already have diagonal attacks from generateAttackMoves)
+      // en passant
       if (row === enPassantRow && lastMove) {
         const [lastFrom, lastTo] = lastMove;
         const lastPiece = board[lastTo[0]][lastTo[1]];
@@ -157,13 +158,13 @@ export const generateMoves = (
       break;
 
     case "king":
-      // Castling (regular king moves already added by generateAttackMoves)
+      // castling logic
       if (!piece.hasMoved) {
         const backRank = color === "white" ? 7 : 0;
 
-        // Check king is not currently in check
+        // king cant be in check
         if (!isSquareUnderAttack(row, col, color, board)) {
-          // Kingside castling
+          // kingside
           const kingsideRook = board[backRank][7];
           if (
             kingsideRook?.type === "rook" &&
@@ -177,7 +178,7 @@ export const generateMoves = (
             moves.push([backRank, 6]);
           }
 
-          // Queenside castling
+          // queenside
           const queensideRook = board[backRank][0];
           if (
             queensideRook?.type === "rook" &&
@@ -258,8 +259,19 @@ export const isCheckmate = (
         const moves = generateMoves(r, c, piece, board, lastMove);
         for (const [mr, mc] of moves) {
           const newBoard = board.map((row) => [...row]);
-          newBoard[mr][mc] = newBoard[r][c];
+          const movingPiece = newBoard[r][c];
+          newBoard[mr][mc] = movingPiece;
           newBoard[r][c] = null;
+
+          // handle en passant
+          if (
+            movingPiece?.type === "pawn" &&
+            Math.abs(mc - c) === 1 &&
+            !board[mr][mc]
+          ) {
+            newBoard[r][mc] = null;
+          }
+
           if (!isInCheck(kingColor, newBoard)) {
             return false;
           }
@@ -275,26 +287,25 @@ export const isStalemate = (
   board: Board,
   lastMove: [Position, Position] | null
 ): boolean => {
-  // If in check, it's not stalemate
   if (isInCheck(kingColor, board)) {
     return false;
   }
 
-  // Check if the player has any legal moves
+  // check all all moves a player can make
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       const piece = board[r][c];
       if (piece && piece.color === kingColor) {
         const moves = generateMoves(r, c, piece, board, lastMove);
 
-        // Check if any move is legal (doesn't put king in check)
+        // check which moves don't put them in check
         for (const [mr, mc] of moves) {
           const testBoard = board.map((row) => [...row]);
           const movingPiece = testBoard[r][c];
           testBoard[mr][mc] = movingPiece;
           testBoard[r][c] = null;
 
-          // Handle en passant in test board
+          // handle en passant
           if (
             movingPiece?.type === "pawn" &&
             Math.abs(mc - c) === 1 &&
@@ -303,13 +314,14 @@ export const isStalemate = (
             testBoard[r][mc] = null;
           }
 
+          // there is a valid move so not a stalemate
           if (!isInCheck(kingColor, testBoard)) {
-            return false; // Found a legal move, not stalemate
+            return false;
           }
         }
       }
     }
   }
 
-  return true; // No legal moves and not in check = stalemate
+  return true;
 };

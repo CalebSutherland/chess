@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Board, Color, Position } from "../types/chess_types";
 import {
   generateMoves,
@@ -9,9 +9,11 @@ import {
 import BoardDisplay from "./BoardDisplay";
 import "./Chess.css";
 
-import { initialBoard, testBoard, stalemateTest } from "../game/boards";
+import { initialBoard, testBoards } from "../game/boards";
 
 export default function Chess() {
+  const debugMode = true;
+
   const [board, setBoard] = useState<Board>(initialBoard);
   const [selected, setSelected] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[] | null>(null);
@@ -20,6 +22,10 @@ export default function Chess() {
   const [inCheck, setInCheck] = useState<Color | null>(null);
   const [checkMate, setCheckmate] = useState(false);
   const [stalemate, setStalemate] = useState(false);
+
+  useEffect(() => {
+    console.log(board);
+  }, [board]);
 
   const handleSquareClick = (position: Position) => {
     if (checkMate || stalemate) return;
@@ -47,7 +53,7 @@ export default function Chess() {
           newBoard[backRank][5] = { ...board[backRank][7]!, hasMoved: true };
           newBoard[backRank][7] = null;
         } else if (col === 2) {
-          // Qqeenside castling
+          // queenside castling
           newBoard[backRank][3] = { ...board[backRank][0]!, hasMoved: true };
           newBoard[backRank][0] = null;
         }
@@ -64,33 +70,34 @@ export default function Chess() {
 
       // if the move doesnt put them in check
       if (!isInCheck(currentTurn, newBoard)) {
+        const newLastMove: [Position, Position] = [
+          [selected[0], selected[1]],
+          [row, col],
+        ];
         setBoard(newBoard);
         const nextTurn = currentTurn === "white" ? "black" : "white";
 
         if (isInCheck(nextTurn, newBoard)) {
           setInCheck(nextTurn);
 
-          if (isCheckmate(nextTurn, newBoard, lastMove)) {
+          if (isCheckmate(nextTurn, newBoard, newLastMove)) {
             setCheckmate(true);
           }
         } else {
           setInCheck(null);
 
           // check for stalemate when not in check
-          if (isStalemate(nextTurn, newBoard, lastMove)) {
+          if (isStalemate(nextTurn, newBoard, newLastMove)) {
             setStalemate(true);
           }
         }
 
         setCurrentTurn(nextTurn);
+        setLastMove(newLastMove);
       }
 
       setSelected(null);
       setValidMoves(null);
-      setLastMove([
-        [selected[0], selected[1]],
-        [row, col],
-      ]);
       return;
     }
     // if theres a correct color peice at this position
@@ -119,6 +126,17 @@ export default function Chess() {
     }
   };
 
+  const resetGame = (board = initialBoard) => {
+    setBoard(board);
+    setCheckmate(false);
+    setStalemate(false);
+    setCurrentTurn("white");
+    setValidMoves(null);
+    setLastMove(null);
+    setSelected(null);
+    setInCheck(null);
+  };
+
   return (
     <div className="chess">
       <p>Turn: {currentTurn}</p>
@@ -136,6 +154,18 @@ export default function Chess() {
         inCheck={inCheck}
         handleSquareClick={handleSquareClick}
       />
+      {debugMode &&
+        testBoards.map((test) => (
+          <button
+            key={test.name}
+            onClick={() => {
+              resetGame();
+              setBoard(test.board);
+            }}
+          >
+            {test.name}
+          </button>
+        ))}
     </div>
   );
 }

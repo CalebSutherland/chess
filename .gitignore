@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Jest
+coverage/
+*.lcov
+.jest-cache/
+
+# Test results
+test-results/
+junit.xml
