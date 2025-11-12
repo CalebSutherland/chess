@@ -269,3 +269,47 @@ export const isCheckmate = (
   }
   return true;
 };
+
+export const isStalemate = (
+  kingColor: Color,
+  board: Board,
+  lastMove: [Position, Position] | null
+): boolean => {
+  // If in check, it's not stalemate
+  if (isInCheck(kingColor, board)) {
+    return false;
+  }
+
+  // Check if the player has any legal moves
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (piece && piece.color === kingColor) {
+        const moves = generateMoves(r, c, piece, board, lastMove);
+
+        // Check if any move is legal (doesn't put king in check)
+        for (const [mr, mc] of moves) {
+          const testBoard = board.map((row) => [...row]);
+          const movingPiece = testBoard[r][c];
+          testBoard[mr][mc] = movingPiece;
+          testBoard[r][c] = null;
+
+          // Handle en passant in test board
+          if (
+            movingPiece?.type === "pawn" &&
+            Math.abs(mc - c) === 1 &&
+            !board[mr][mc]
+          ) {
+            testBoard[r][mc] = null;
+          }
+
+          if (!isInCheck(kingColor, testBoard)) {
+            return false; // Found a legal move, not stalemate
+          }
+        }
+      }
+    }
+  }
+
+  return true; // No legal moves and not in check = stalemate
+};

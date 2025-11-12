@@ -1,158 +1,15 @@
 import { useState } from "react";
-import type { Board, Color, PieceType, Position } from "../types/chess_types";
+import type { Board, Color, Position } from "../types/chess_types";
 import {
-  findKingPos,
   generateMoves,
   isCheckmate,
   isInCheck,
+  isStalemate,
 } from "../game/game_logic";
+import BoardDisplay from "./BoardDisplay";
 import "./Chess.css";
 
-import whitePawn from "../assets/pieces/white/pawn.svg";
-import whiteBishop from "../assets/pieces/white/bishop.svg";
-import whiteKnight from "../assets/pieces/white/knight.svg";
-import whiteRook from "../assets/pieces/white/rook.svg";
-import whiteQueen from "../assets/pieces/white/queen.svg";
-import whiteKing from "../assets/pieces/white/king.svg";
-import blackPawn from "../assets/pieces/black/pawn.svg";
-import blackBishop from "../assets/pieces/black/bishop.svg";
-import blackKnight from "../assets/pieces/black/knight.svg";
-import blackRook from "../assets/pieces/black/rook.svg";
-import blackQueen from "../assets/pieces/black/queen.svg";
-import blackKing from "../assets/pieces/black/king.svg";
-
-const pieceIcons: Record<PieceType, Record<Color, string>> = {
-  king: { white: whiteKing, black: blackKing },
-  queen: { white: whiteQueen, black: blackQueen },
-  rook: { white: whiteRook, black: blackRook },
-  bishop: { white: whiteBishop, black: blackBishop },
-  knight: { white: whiteKnight, black: blackKnight },
-  pawn: { white: whitePawn, black: blackPawn },
-};
-
-const initialBoard: Board = [
-  [
-    { type: "rook", color: "black", hasMoved: false },
-    { type: "knight", color: "black", hasMoved: false },
-    { type: "bishop", color: "black", hasMoved: false },
-    { type: "queen", color: "black", hasMoved: false },
-    { type: "king", color: "black", hasMoved: false },
-    { type: "bishop", color: "black", hasMoved: false },
-    { type: "knight", color: "black", hasMoved: false },
-    { type: "rook", color: "black", hasMoved: false },
-  ],
-  Array(8)
-    .fill(null)
-    .map(() => ({ type: "pawn", color: "black" })),
-  Array(8).fill(null),
-  Array(8).fill(null),
-  Array(8).fill(null),
-  Array(8).fill(null),
-  Array(8)
-    .fill(null)
-    .map(() => ({ type: "pawn", color: "white" })),
-  [
-    { type: "rook", color: "white", hasMoved: false },
-    { type: "knight", color: "white", hasMoved: false },
-    { type: "bishop", color: "white", hasMoved: false },
-    { type: "queen", color: "white", hasMoved: false },
-    { type: "king", color: "white", hasMoved: false },
-    { type: "bishop", color: "white", hasMoved: false },
-    { type: "knight", color: "white", hasMoved: false },
-    { type: "rook", color: "white", hasMoved: false },
-  ],
-];
-
-interface BoardSquareProps {
-  color: string;
-  piece: string | null;
-  highlight?: boolean;
-  lastMove?: boolean;
-  inCheck?: boolean;
-  handleSquareClick: () => void;
-}
-function BoardSquare({
-  color,
-  piece,
-  highlight,
-  lastMove,
-  inCheck,
-  handleSquareClick,
-}: BoardSquareProps) {
-  return (
-    <div
-      className={`square ${lastMove ? "last_move" : ""} ${
-        inCheck ? "check" : ""
-      }`}
-      style={{ backgroundColor: color }}
-      onClick={handleSquareClick}
-    >
-      {piece && <img src={piece} alt="chess piece" className="piece" />}
-      {highlight && <div className="highlight-dot"></div>}
-    </div>
-  );
-}
-
-interface BoardDisplayProps {
-  board: Board;
-  selected: Position | null;
-  validMoves: Position[] | null;
-  lastMove: [Position, Position] | null;
-  currentTurn: Color;
-  inCheck: Color | null;
-  handleSquareClick: (position: Position) => void;
-}
-function BoardDisplay({
-  board,
-  selected,
-  validMoves,
-  lastMove,
-  currentTurn,
-  inCheck,
-  handleSquareClick,
-}: BoardDisplayProps) {
-  let kingPos: Position | null = null;
-  if (inCheck) {
-    kingPos = findKingPos(currentTurn, board);
-  }
-  return (
-    <div className="board">
-      {board.map((row, r) =>
-        row.map((_, c) => {
-          const isSelected = selected?.[0] === r && selected?.[1] === c;
-          const color = isSelected
-            ? "yellow"
-            : (r + c) % 2 === 0
-            ? "#edce8a"
-            : "#720a0a";
-          const isHighlight = validMoves?.some(
-            (move) => move[0] === r && move[1] === c
-          );
-          const isLastMove = lastMove?.some(
-            (move) => move[0] === r && move[1] === c
-          );
-          const kingInCheck = kingPos
-            ? kingPos[0] === r && kingPos[1] === c
-            : false;
-          const piece = board[r][c];
-          const pieceIcon = piece ? pieceIcons[piece.type][piece.color] : null;
-
-          return (
-            <BoardSquare
-              key={`${r}-${c}`}
-              piece={pieceIcon}
-              color={color}
-              highlight={isHighlight}
-              lastMove={isLastMove}
-              inCheck={kingInCheck}
-              handleSquareClick={() => handleSquareClick([r, c])}
-            />
-          );
-        })
-      )}
-    </div>
-  );
-}
+import { initialBoard, testBoard, stalemateTest } from "../game/boards";
 
 export default function Chess() {
   const [board, setBoard] = useState<Board>(initialBoard);
@@ -162,9 +19,10 @@ export default function Chess() {
   const [currentTurn, setCurrentTurn] = useState<Color>("white");
   const [inCheck, setInCheck] = useState<Color | null>(null);
   const [checkMate, setCheckmate] = useState(false);
+  const [stalemate, setStalemate] = useState(false);
 
   const handleSquareClick = (position: Position) => {
-    if (checkMate) return;
+    if (checkMate || stalemate) return;
 
     const row = position[0];
     const col = position[1];
@@ -185,11 +43,11 @@ export default function Chess() {
         const backRank = currentTurn === "white" ? 7 : 0;
 
         if (col === 6) {
-          // Kingside castling - rook from h-file to f-file
+          // kingside castling
           newBoard[backRank][5] = { ...board[backRank][7]!, hasMoved: true };
           newBoard[backRank][7] = null;
         } else if (col === 2) {
-          // Queenside castling - rook from a-file to d-file
+          // Qqeenside castling
           newBoard[backRank][3] = { ...board[backRank][0]!, hasMoved: true };
           newBoard[backRank][0] = null;
         }
@@ -217,6 +75,11 @@ export default function Chess() {
           }
         } else {
           setInCheck(null);
+
+          // check for stalemate when not in check
+          if (isStalemate(nextTurn, newBoard, lastMove)) {
+            setStalemate(true);
+          }
         }
 
         setCurrentTurn(nextTurn);
@@ -263,6 +126,7 @@ export default function Chess() {
       {checkMate && (
         <p>Checkmate! {currentTurn === "white" ? "black" : "white"} wins!</p>
       )}
+      {stalemate && <p>Stalemate! It's a draw</p>}
       <BoardDisplay
         board={board}
         selected={selected}
