@@ -27,103 +27,139 @@ export default function Chess() {
     console.log(board);
   }, [board]);
 
+  // handles castling and en passant
+  const applySpecialMoves = (
+    newBoard: Board,
+    selectedPiece: any,
+    fromRow: number,
+    fromCol: number,
+    toRow: number,
+    toCol: number
+  ) => {
+    // handle castling
+    if (selectedPiece?.type === "king" && Math.abs(toCol - fromCol) === 2) {
+      const backRank = currentTurn === "white" ? 7 : 0;
+
+      if (toCol === 6) {
+        // kingside
+        newBoard[backRank][5] = { ...board[backRank][7]!, hasMoved: true };
+        newBoard[backRank][7] = null;
+      } else if (toCol === 2) {
+        // queenside
+        newBoard[backRank][3] = { ...board[backRank][0]!, hasMoved: true };
+        newBoard[backRank][0] = null;
+      }
+    }
+
+    // handle en passant
+    if (
+      selectedPiece?.type === "pawn" &&
+      Math.abs(toCol - fromCol) === 1 &&
+      !board[toRow][toCol]
+    ) {
+      newBoard[fromRow][toCol] = null;
+    }
+  };
+
+  const executeMove = (fromPos: Position, toPos: Position) => {
+    const [fromRow, fromCol] = fromPos;
+    const [toRow, toCol] = toPos;
+    const selectedPiece = board[fromRow][fromCol];
+
+    const newBoard = board.map((row) => [...row]);
+    newBoard[toRow][toCol] = { ...selectedPiece!, hasMoved: true };
+    newBoard[fromRow][fromCol] = null;
+
+    applySpecialMoves(newBoard, selectedPiece, fromRow, fromCol, toRow, toCol);
+
+    // make sure the move is legal
+    if (isInCheck(currentTurn, newBoard)) {
+      return false;
+    }
+
+    const newLastMove: [Position, Position] = [fromPos, toPos];
+    const nextTurn = currentTurn === "white" ? "black" : "white";
+
+    setBoard(newBoard);
+    setLastMove(newLastMove);
+    setCurrentTurn(nextTurn);
+
+    // Check game end conditions
+    checkGameEndConditions(nextTurn, newBoard, newLastMove);
+
+    return true;
+  };
+
+  const checkGameEndConditions = (
+    nextTurn: Color,
+    newBoard: Board,
+    newLastMove: [Position, Position]
+  ) => {
+    if (isInCheck(nextTurn, newBoard)) {
+      setInCheck(nextTurn);
+      if (isCheckmate(nextTurn, newBoard, newLastMove)) {
+        setCheckmate(true);
+      }
+    } else {
+      setInCheck(null);
+      if (isStalemate(nextTurn, newBoard, newLastMove)) {
+        setStalemate(true);
+      }
+    }
+  };
+
+  const calculateLegalMoves = (row: number, col: number): Position[] => {
+    const piece = board[row][col];
+    if (!piece) return [];
+
+    const moves = generateMoves(row, col, piece, board, lastMove);
+
+    // filter out moves that would put own king in check
+    return moves.filter(([mr, mc]) => {
+      const testBoard = board.map((r) => [...r]);
+      const movingPiece = testBoard[row][col];
+      testBoard[mr][mc] = movingPiece;
+      testBoard[row][col] = null;
+
+      // handle en passant
+      if (
+        movingPiece?.type === "pawn" &&
+        Math.abs(mc - col) === 1 &&
+        !board[mr][mc]
+      ) {
+        testBoard[row][mc] = null;
+      }
+
+      return !isInCheck(currentTurn, testBoard);
+    });
+  };
+
   const handleSquareClick = (position: Position) => {
     if (checkMate || stalemate) return;
 
-    const row = position[0];
-    const col = position[1];
+    const [row, col] = position;
 
-    // if piece selected and valid move
+    // if a piece is already selected check if its a valid move
     if (
       selected &&
       validMoves?.some((move) => move[0] === row && move[1] === col)
     ) {
-      const newBoard = board.map((row) => [...row]);
-      const selectedPiece = board[selected[0]][selected[1]];
-
-      newBoard[row][col] = { ...selectedPiece!, hasMoved: true };
-      newBoard[selected[0]][selected[1]] = null;
-
-      // handle castling
-      if (selectedPiece?.type === "king" && Math.abs(col - selected[1]) === 2) {
-        const backRank = currentTurn === "white" ? 7 : 0;
-
-        if (col === 6) {
-          // kingside castling
-          newBoard[backRank][5] = { ...board[backRank][7]!, hasMoved: true };
-          newBoard[backRank][7] = null;
-        } else if (col === 2) {
-          // queenside castling
-          newBoard[backRank][3] = { ...board[backRank][0]!, hasMoved: true };
-          newBoard[backRank][0] = null;
-        }
-      }
-
-      // handle en passant
-      if (
-        selectedPiece?.type === "pawn" &&
-        Math.abs(col - selected[1]) === 1 &&
-        !board[row][col]
-      ) {
-        newBoard[selected[0]][col] = null;
-      }
-
-      // if the move doesnt put them in check
-      if (!isInCheck(currentTurn, newBoard)) {
-        const newLastMove: [Position, Position] = [
-          [selected[0], selected[1]],
-          [row, col],
-        ];
-        setBoard(newBoard);
-        const nextTurn = currentTurn === "white" ? "black" : "white";
-
-        if (isInCheck(nextTurn, newBoard)) {
-          setInCheck(nextTurn);
-
-          if (isCheckmate(nextTurn, newBoard, newLastMove)) {
-            setCheckmate(true);
-          }
-        } else {
-          setInCheck(null);
-
-          // check for stalemate when not in check
-          if (isStalemate(nextTurn, newBoard, newLastMove)) {
-            setStalemate(true);
-          }
-        }
-
-        setCurrentTurn(nextTurn);
-        setLastMove(newLastMove);
-      }
-
+      executeMove(selected, position);
       setSelected(null);
       setValidMoves(null);
       return;
     }
-    // if theres a correct color peice at this position
-    else if (board[row][col] && board[row][col].color === currentTurn) {
+
+    // if selecting a piece of the current turns color update the valid moves
+    if (board[row][col]?.color === currentTurn) {
       setSelected(position);
-      const moves = generateMoves(row, col, board[row][col], board, lastMove);
-      // find moves that dont put king in check
-      const legalMoves = moves.filter(([mr, mc]) => {
-        const testBoard = board.map((r) => [...r]);
-        const movingPiece = testBoard[row][col];
-        testBoard[mr][mc] = movingPiece;
-        testBoard[row][col] = null;
-        if (
-          movingPiece?.type === "pawn" &&
-          Math.abs(mc - col) === 1 &&
-          !board[mr][mc]
-        ) {
-          testBoard[row][mc] = null;
-        }
-        return !isInCheck(currentTurn, testBoard);
-      });
-      setValidMoves(legalMoves);
-    } else {
-      setSelected(null);
-      setValidMoves(null);
+      setValidMoves(calculateLegalMoves(row, col));
+      return;
     }
+
+    // otherwise deselect current piece
+    setSelected(null);
+    setValidMoves(null);
   };
 
   const resetGame = (board = initialBoard) => {
@@ -154,6 +190,7 @@ export default function Chess() {
         inCheck={inCheck}
         handleSquareClick={handleSquareClick}
       />
+      <button onClick={() => resetGame()}>Reset Game</button>
       {debugMode &&
         testBoards.map((test) => (
           <button
