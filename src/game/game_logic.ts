@@ -1,4 +1,10 @@
-import type { Board, Color, Piece, Position } from "../types/chess_types";
+import type {
+  Board,
+  Color,
+  Piece,
+  PieceType,
+  Position,
+} from "../types/chess_types";
 
 const isValidPosition = (row: number, col: number) => {
   return row >= 0 && row < 8 && col >= 0 && col < 8;
@@ -324,4 +330,37 @@ export const isStalemate = (
   }
 
   return true;
+};
+
+export const shouldPromote = (
+  piece: Piece,
+  toRow: number,
+  color: Color
+): boolean => {
+  if (piece.type !== "pawn") return false;
+  return (
+    (color === "white" && toRow === 0) || (color === "black" && toRow === 7)
+  );
+};
+
+export const promotePawn = (
+  board: Board,
+  row: number,
+  col: number,
+  promotionType: PieceType
+): Board => {
+  const newBoard = board.map((r) => [...r]);
+  const pawn = newBoard[row][col];
+
+  if (!pawn || pawn.type !== "pawn") {
+    throw new Error("Cannot promote non-pawn piece");
+  }
+
+  newBoard[row][col] = {
+    type: promotionType,
+    color: pawn.color,
+    hasMoved: true,
+  };
+
+  return newBoard;
 };

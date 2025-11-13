@@ -4,6 +4,7 @@ import {
   isCheckmate,
   isInCheck,
   isStalemate,
+  promotePawn,
 } from "../game/game_logic";
 import BoardDisplay from "./BoardDisplay";
 import PromotionModal from "./PromotionModal";
@@ -132,18 +133,11 @@ export default function Chess() {
   const handlePromotion = (pieceType: PieceType) => {
     if (!promotionPending) return;
 
-    const newBoard = board.map((row) => [...row]);
-    const { position, color } = promotionPending;
+    const { position } = promotionPending;
     const [row, col] = position;
 
-    // replace pawn with chosen piece
-    newBoard[row][col] = {
-      type: pieceType,
-      color: color,
-      hasMoved: true,
-    };
+    const newBoard = promotePawn(board, row, col, pieceType);
 
-    // complete the move with the promoted piece
     finalizeMoveWithBoard(newBoard, lastMove!);
     setPromotionPending(null);
   };

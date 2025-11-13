@@ -5,6 +5,8 @@ import {
   isStalemate,
   findKingPos,
   isSquareUnderAttack,
+  shouldPromote,
+  promotePawn,
 } from "../game_logic";
 import { createBoardFromFEN } from "../boards";
 import type { Piece, Position } from "../../types/chess_types";
@@ -422,6 +424,97 @@ describe("Chess Game Logic Tests", () => {
       const board = createBoardFromFEN("r7/8/8/8/8/8/8/8");
 
       expect(isSquareUnderAttack(7, 7, "white", board)).toBe(false);
+    });
+  });
+
+  describe("Pawn Promotion", () => {
+    describe("shouldPromote", () => {
+      it("should return true when white pawn reaches rank 1 (row 0)", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4P3");
+        const whitePawn = board[7][4]!;
+
+        expect(shouldPromote(whitePawn, 0, "white")).toBe(true);
+      });
+
+      it("should return true when black pawn reaches rank 8 (row 7)", () => {
+        const board = createBoardFromFEN("4p3/8/8/8/8/8/8/8");
+        const blackPawn = board[0][4]!;
+
+        expect(shouldPromote(blackPawn, 7, "black")).toBe(true);
+      });
+
+      it("should return false when pawn is not at promotion rank", () => {
+        const board = createBoardFromFEN("8/4P3/8/8/8/8/8/8");
+        const whitePawn = board[1][4]!;
+
+        expect(shouldPromote(whitePawn, 1, "white")).toBe(false);
+      });
+
+      it("should return false for non-pawn pieces", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4Q3");
+        const whiteQueen = board[7][4]!;
+
+        expect(shouldPromote(whiteQueen, 0, "white")).toBe(false);
+      });
+    });
+
+    describe("promotePawn", () => {
+      it("should promote white pawn to queen", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4P3");
+        const newBoard = promotePawn(board, 7, 4, "queen");
+
+        expect(newBoard[7][4]?.type).toBe("queen");
+        expect(newBoard[7][4]?.color).toBe("white");
+        expect(newBoard[7][4]?.hasMoved).toBe(true);
+      });
+
+      it("should promote black pawn to rook", () => {
+        const board = createBoardFromFEN("4p3/8/8/8/8/8/8/8");
+        const newBoard = promotePawn(board, 0, 4, "rook");
+
+        expect(newBoard[0][4]?.type).toBe("rook");
+        expect(newBoard[0][4]?.color).toBe("black");
+        expect(newBoard[0][4]?.hasMoved).toBe(true);
+      });
+
+      it("should promote to bishop", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4P3");
+        const newBoard = promotePawn(board, 7, 4, "bishop");
+
+        expect(newBoard[7][4]?.type).toBe("bishop");
+      });
+
+      it("should promote to knight", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4P3");
+        const newBoard = promotePawn(board, 7, 4, "knight");
+
+        expect(newBoard[7][4]?.type).toBe("knight");
+      });
+
+      it("should not modify original board", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4P3");
+        const originalPiece = board[7][4];
+
+        promotePawn(board, 7, 4, "queen");
+
+        expect(board[7][4]).toEqual(originalPiece);
+      });
+
+      it("should throw error when promoting non-pawn piece", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4Q3");
+
+        expect(() => promotePawn(board, 7, 4, "queen")).toThrow(
+          "Cannot promote non-pawn piece"
+        );
+      });
+
+      it("should throw error when promoting empty square", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/8");
+
+        expect(() => promotePawn(board, 7, 4, "queen")).toThrow(
+          "Cannot promote non-pawn piece"
+        );
+      });
     });
   });
 });
