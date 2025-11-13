@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import type { Board, Color, Position } from "../types/chess_types";
+import type {
+  Board,
+  Color,
+  GameState,
+  Piece,
+  Position,
+} from "../types/chess_types";
 import {
   generateMoves,
   isCheckmate,
@@ -23,14 +29,60 @@ export default function Chess() {
   const [checkMate, setCheckmate] = useState(false);
   const [stalemate, setStalemate] = useState(false);
 
+  const [history, setHistory] = useState<GameState[]>([
+    {
+      board: initialBoard,
+      lastMove: null,
+      currentTurn: "white",
+      inCheck: null,
+      checkMate: false,
+      stalemate: false,
+    },
+  ]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
   useEffect(() => {
     console.log(board);
   }, [board]);
 
+  const saveToHistory = (state: GameState) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(state);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const restoreState = (state: GameState) => {
+    setBoard(state.board);
+    setLastMove(state.lastMove);
+    setCurrentTurn(state.currentTurn);
+    setInCheck(state.inCheck);
+    setCheckmate(state.checkMate);
+    setStalemate(state.stalemate);
+    setSelected(null);
+    setValidMoves(null);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      restoreState(history[newIndex]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      restoreState(history[newIndex]);
+    }
+  };
+
   // handles castling and en passant
   const applySpecialMoves = (
     newBoard: Board,
-    selectedPiece: any,
+    selectedPiece: Piece | null,
     fromRow: number,
     fromCol: number,
     toRow: number,
@@ -80,32 +132,38 @@ export default function Chess() {
     const newLastMove: [Position, Position] = [fromPos, toPos];
     const nextTurn = currentTurn === "white" ? "black" : "white";
 
+    let newInCheck: Color | null = null;
+    let newCheckmate = false;
+    let newStalemate = false;
+
+    if (isInCheck(nextTurn, newBoard)) {
+      newInCheck = nextTurn;
+      if (isCheckmate(nextTurn, newBoard, newLastMove)) {
+        newCheckmate = true;
+      }
+    } else {
+      if (isStalemate(nextTurn, newBoard, newLastMove)) {
+        newStalemate = true;
+      }
+    }
+
     setBoard(newBoard);
     setLastMove(newLastMove);
     setCurrentTurn(nextTurn);
+    setInCheck(newInCheck);
+    setCheckmate(newCheckmate);
+    setStalemate(newStalemate);
 
-    // Check game end conditions
-    checkGameEndConditions(nextTurn, newBoard, newLastMove);
+    saveToHistory({
+      board: newBoard,
+      lastMove: newLastMove,
+      currentTurn: nextTurn,
+      inCheck: newInCheck,
+      checkMate: newCheckmate,
+      stalemate: newStalemate,
+    });
 
     return true;
-  };
-
-  const checkGameEndConditions = (
-    nextTurn: Color,
-    newBoard: Board,
-    newLastMove: [Position, Position]
-  ) => {
-    if (isInCheck(nextTurn, newBoard)) {
-      setInCheck(nextTurn);
-      if (isCheckmate(nextTurn, newBoard, newLastMove)) {
-        setCheckmate(true);
-      }
-    } else {
-      setInCheck(null);
-      if (isStalemate(nextTurn, newBoard, newLastMove)) {
-        setStalemate(true);
-      }
-    }
   };
 
   const calculateLegalMoves = (row: number, col: number): Position[] => {
@@ -162,8 +220,17 @@ export default function Chess() {
     setValidMoves(null);
   };
 
-  const resetGame = (board = initialBoard) => {
-    setBoard(board);
+  const resetGame = (newBoard = initialBoard) => {
+    const initialState: GameState = {
+      board: newBoard,
+      lastMove: null,
+      currentTurn: "white",
+      inCheck: null,
+      checkMate: false,
+      stalemate: false,
+    };
+
+    setBoard(newBoard);
     setCheckmate(false);
     setStalemate(false);
     setCurrentTurn("white");
@@ -171,7 +238,26 @@ export default function Chess() {
     setLastMove(null);
     setSelected(null);
     setInCheck(null);
+
+    setHistory([initialState]);
+    setHistoryIndex(0);
   };
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && canUndo) {
+        handleUndo();
+      } else if (e.key === "ArrowRight" && canRedo) {
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [canUndo, canRedo, historyIndex]);
 
   return (
     <div className="chess">
@@ -181,6 +267,18 @@ export default function Chess() {
         <p>Checkmate! {currentTurn === "white" ? "black" : "white"} wins!</p>
       )}
       {stalemate && <p>Stalemate! It's a draw</p>}
+      <div className="controls">
+        <button onClick={handleUndo} disabled={!canUndo}>
+          Undo (←)
+        </button>
+        <button onClick={handleRedo} disabled={!canRedo}>
+          Redo (→)
+        </button>
+        <button onClick={() => resetGame()}>Reset Game</button>
+        <span style={{ marginLeft: "10px", color: "#666" }}>
+          Move {historyIndex} / {history.length - 1}
+        </span>
+      </div>
       <BoardDisplay
         board={board}
         selected={selected}
@@ -190,14 +288,12 @@ export default function Chess() {
         inCheck={inCheck}
         handleSquareClick={handleSquareClick}
       />
-      <button onClick={() => resetGame()}>Reset Game</button>
       {debugMode &&
         testBoards.map((test) => (
           <button
             key={test.name}
             onClick={() => {
-              resetGame();
-              setBoard(test.board);
+              resetGame(test.board);
             }}
           >
             {test.name}

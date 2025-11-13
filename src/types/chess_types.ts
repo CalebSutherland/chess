@@ -15,3 +15,12 @@ export interface Piece {
 
 export type Board = (Piece | null)[][];
 export type Position = [number, number];
+
+export type GameState = {
+  board: Board;
+  lastMove: [Position, Position] | null;
+  currentTurn: Color;
+  inCheck: Color | null;
+  checkMate: boolean;
+  stalemate: boolean;
+};

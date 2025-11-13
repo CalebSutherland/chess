@@ -102,4 +102,8 @@ export const testBoards = [
     name: "en passant test",
     board: createBoardFromFEN("8/8/3ppp2/3pkp2/3pp3/8/PPPPPPPP/5Q2"),
   },
+  {
+    name: "smothered mate test",
+    board: createBoardFromFEN("6rk/6pp/7N/8/8/8/8/8"),
+  },
 ];

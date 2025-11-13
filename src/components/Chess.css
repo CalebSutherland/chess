@@ -3,6 +3,16 @@
   flex-direction: column;
 }
 
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 30rem;
+  aspect-ratio: 1 / 1;
+  border: 1px solid black;
+  margin: 0.25rem 0 1rem;
+}
+
 .square {
   position: relative;
   display: flex;
@@ -28,15 +38,6 @@
 
 .square.check::after {
   background-color: #e20b0ba2;
-}
-
-.board {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  grid-template-rows: repeat(8, 1fr);
-  width: 30rem;
-  aspect-ratio: 1 / 1;
-  border: 1px solid black;
 }
 
 .highlight-dot {

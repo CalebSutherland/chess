@@ -98,7 +98,7 @@ describe("Chess Game Logic Tests", () => {
       const moves = generateMoves(4, 4, blackPawn, board, lastMove);
 
       expect(moves).toContainEqual([5, 5]);
-      expect(isCheckmate("black", board, lastMove)).toBeFalsy();
+      expect(isCheckmate("black", board, lastMove)).toBe(false);
     });
   });
 
@@ -327,22 +327,25 @@ describe("Chess Game Logic Tests", () => {
 
   describe("Checkmate Detection", () => {
     it("should detect back rank checkmate", () => {
-      // Famous back rank mate: king trapped by own pawns
       const board = createBoardFromFEN("1R4k1/5ppp/8/8/8/8/8/8");
 
       expect(isCheckmate("black", board, null)).toBe(true);
     });
 
     it("should detect two rook checkmate (ladder mate)", () => {
-      // Two rooks delivering checkmate
       const board = createBoardFromFEN("k7/8/1R6/R7/8/8/8/7K");
 
       expect(isCheckmate("black", board, null)).toBe(true);
     });
 
     it("should detect queen and king checkmate", () => {
-      // Queen and king vs lone king
       const board = createBoardFromFEN("7k/5Q2/6K1/8/8/8/8/8");
+
+      expect(isCheckmate("black", board, null)).toBe(true);
+    });
+
+    it("should detect smothered checkmate", () => {
+      const board = createBoardFromFEN("6rk/5Npp/8/8/8/8/8/8");
 
       expect(isCheckmate("black", board, null)).toBe(true);
     });
