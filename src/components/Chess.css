@@ -3,6 +3,10 @@
   flex-direction: column;
 }
 
+.game-container {
+  display: flex;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(8, 1fr);

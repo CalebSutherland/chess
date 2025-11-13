@@ -8,6 +8,7 @@ import {
 } from "../game/game_logic";
 import BoardDisplay from "./BoardDisplay";
 import PromotionModal from "./PromotionModal";
+import History from "./History";
 import "./Chess.css";
 
 import type {
@@ -70,6 +71,11 @@ export default function Chess() {
     setStalemate(state.stalemate);
     setSelected(null);
     setValidMoves(null);
+  };
+
+  const jumpToMove = (index: number) => {
+    setHistoryIndex(index);
+    restoreState(history[index]);
   };
 
   const handleUndo = () => {
@@ -316,10 +322,6 @@ export default function Chess() {
       )}
       {stalemate && <p>Stalemate! It's a draw</p>}
 
-      {promotionPending && (
-        <PromotionModal color={currentTurn} handlePromotion={handlePromotion} />
-      )}
-
       <div className="controls">
         <button onClick={handleUndo} disabled={!canUndo}>
           Undo (←)
@@ -332,15 +334,31 @@ export default function Chess() {
           Move {historyIndex} / {history.length - 1}
         </span>
       </div>
-      <BoardDisplay
-        board={board}
-        selected={selected}
-        validMoves={validMoves}
-        lastMove={lastMove}
-        currentTurn={currentTurn}
-        inCheck={inCheck}
-        handleSquareClick={handleSquareClick}
-      />
+
+      <div className="game-container">
+        {promotionPending && (
+          <PromotionModal
+            color={currentTurn}
+            handlePromotion={handlePromotion}
+          />
+        )}
+
+        <BoardDisplay
+          board={board}
+          selected={selected}
+          validMoves={validMoves}
+          lastMove={lastMove}
+          currentTurn={currentTurn}
+          inCheck={inCheck}
+          handleSquareClick={handleSquareClick}
+        />
+        <History
+          history={history}
+          historyIndex={historyIndex}
+          onMoveClick={jumpToMove}
+        />
+      </div>
+
       {debugMode &&
         testBoards.map((test) => (
           <button

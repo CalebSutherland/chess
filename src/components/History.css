@@ -1,0 +1,17 @@
+.move-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.move-pair {
+  display: grid;
+  grid-template-columns: 20px 1fr 1fr;
+  gap: 5px;
+  align-items: center;
+}
+
+.move-button.active {
+  background: #4a90e2;
+  color: white;
+}

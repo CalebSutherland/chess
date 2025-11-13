@@ -84,7 +84,7 @@ export const testBoards = [
   },
   {
     name: "test board",
-    board: createBoardFromFEN("7k/5Q2/6K1/8/8/8/8/8"),
+    board: createBoardFromFEN("P3k3/R7/8/8/8/8/8/8"),
   },
   {
     name: "checkamte test",

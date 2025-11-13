@@ -352,6 +352,13 @@ describe("Chess Game Logic Tests", () => {
       expect(isCheckmate("black", board, null)).toBe(true);
     });
 
+    it("should detect pawn promotion checkmate", () => {
+      const board = createBoardFromFEN("P3k3/R7/8/8/8/8/8/8");
+      const newBoard = promotePawn(board, 0, 0, "queen");
+
+      expect(isCheckmate("black", newBoard, null)).toBe(true);
+    });
+
     it("should return false when king can escape check", () => {
       const board = createBoardFromFEN("8/8/8/8/8/8/8/4Kr2");
 
@@ -460,21 +467,21 @@ describe("Chess Game Logic Tests", () => {
 
     describe("promotePawn", () => {
       it("should promote white pawn to queen", () => {
-        const board = createBoardFromFEN("8/8/8/8/8/8/8/4P3");
-        const newBoard = promotePawn(board, 7, 4, "queen");
+        const board = createBoardFromFEN("4P3/8/8/8/8/8/8/8");
+        const newBoard = promotePawn(board, 0, 4, "queen");
 
-        expect(newBoard[7][4]?.type).toBe("queen");
-        expect(newBoard[7][4]?.color).toBe("white");
-        expect(newBoard[7][4]?.hasMoved).toBe(true);
+        expect(newBoard[0][4]?.type).toBe("queen");
+        expect(newBoard[0][4]?.color).toBe("white");
+        expect(newBoard[0][4]?.hasMoved).toBe(true);
       });
 
       it("should promote black pawn to rook", () => {
-        const board = createBoardFromFEN("4p3/8/8/8/8/8/8/8");
-        const newBoard = promotePawn(board, 0, 4, "rook");
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4p3");
+        const newBoard = promotePawn(board, 7, 4, "rook");
 
-        expect(newBoard[0][4]?.type).toBe("rook");
-        expect(newBoard[0][4]?.color).toBe("black");
-        expect(newBoard[0][4]?.hasMoved).toBe(true);
+        expect(newBoard[7][4]?.type).toBe("rook");
+        expect(newBoard[7][4]?.color).toBe("black");
+        expect(newBoard[7][4]?.hasMoved).toBe(true);
       });
 
       it("should promote to bishop", () => {
