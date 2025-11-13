@@ -31,3 +31,12 @@ coverage/
 # Test results
 test-results/
 junit.xml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+venv/
+env/
+.venv/

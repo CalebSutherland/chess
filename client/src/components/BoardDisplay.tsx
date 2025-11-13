@@ -1,4 +1,4 @@
-import { pieceIcons } from "../assets/pieces/";
+import { pieceIcons } from "../assets/pieces";
 import { findKingPos } from "../game/game_logic";
 import BoardSquare from "./BoardSquare";
 
