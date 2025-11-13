@@ -106,4 +106,8 @@ export const testBoards = [
     name: "smothered mate test",
     board: createBoardFromFEN("6rk/6pp/7N/8/8/8/8/8"),
   },
+  {
+    name: "promotion test",
+    board: createBoardFromFEN("8/PPPPPPPP/8/8/8/8/pppppppp/8"),
+  },
 ];

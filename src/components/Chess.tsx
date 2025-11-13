@@ -1,11 +1,4 @@
 import { useEffect, useState } from "react";
-import type {
-  Board,
-  Color,
-  GameState,
-  Piece,
-  Position,
-} from "../types/chess_types";
 import {
   generateMoves,
   isCheckmate,
@@ -13,7 +6,17 @@ import {
   isStalemate,
 } from "../game/game_logic";
 import BoardDisplay from "./BoardDisplay";
+import PromotionModal from "./PromotionModal";
 import "./Chess.css";
+
+import type {
+  Board,
+  Color,
+  GameState,
+  Piece,
+  PieceType,
+  Position,
+} from "../types/chess_types";
 
 import { initialBoard, testBoards } from "../game/boards";
 
@@ -28,6 +31,11 @@ export default function Chess() {
   const [inCheck, setInCheck] = useState<Color | null>(null);
   const [checkMate, setCheckmate] = useState(false);
   const [stalemate, setStalemate] = useState(false);
+
+  const [promotionPending, setPromotionPending] = useState<{
+    position: Position;
+    color: Color;
+  } | null>(null);
 
   const [history, setHistory] = useState<GameState[]>([
     {
@@ -113,23 +121,37 @@ export default function Chess() {
     }
   };
 
-  const executeMove = (fromPos: Position, toPos: Position) => {
-    const [fromRow, fromCol] = fromPos;
-    const [toRow, toCol] = toPos;
-    const selectedPiece = board[fromRow][fromCol];
+  const checkPawnPromotion = (piece: Piece | null, toRow: number): boolean => {
+    if (piece?.type !== "pawn") return false;
+    return (
+      (piece.color === "white" && toRow === 0) ||
+      (piece.color === "black" && toRow === 7)
+    );
+  };
+
+  const handlePromotion = (pieceType: PieceType) => {
+    if (!promotionPending) return;
 
     const newBoard = board.map((row) => [...row]);
-    newBoard[toRow][toCol] = { ...selectedPiece!, hasMoved: true };
-    newBoard[fromRow][fromCol] = null;
+    const { position, color } = promotionPending;
+    const [row, col] = position;
 
-    applySpecialMoves(newBoard, selectedPiece, fromRow, fromCol, toRow, toCol);
+    // replace pawn with chosen piece
+    newBoard[row][col] = {
+      type: pieceType,
+      color: color,
+      hasMoved: true,
+    };
 
-    // make sure the move is legal
-    if (isInCheck(currentTurn, newBoard)) {
-      return false;
-    }
+    // complete the move with the promoted piece
+    finalizeMoveWithBoard(newBoard, lastMove!);
+    setPromotionPending(null);
+  };
 
-    const newLastMove: [Position, Position] = [fromPos, toPos];
+  const finalizeMoveWithBoard = (
+    newBoard: Board,
+    newLastMove: [Position, Position]
+  ) => {
     const nextTurn = currentTurn === "white" ? "black" : "white";
 
     let newInCheck: Color | null = null;
@@ -162,7 +184,39 @@ export default function Chess() {
       checkMate: newCheckmate,
       stalemate: newStalemate,
     });
+  };
 
+  const executeMove = (fromPos: Position, toPos: Position) => {
+    const [fromRow, fromCol] = fromPos;
+    const [toRow, toCol] = toPos;
+    const selectedPiece = board[fromRow][fromCol];
+
+    const newBoard = board.map((row) => [...row]);
+    newBoard[toRow][toCol] = { ...selectedPiece!, hasMoved: true };
+    newBoard[fromRow][fromCol] = null;
+
+    applySpecialMoves(newBoard, selectedPiece, fromRow, fromCol, toRow, toCol);
+
+    // make sure the move is legal
+    if (isInCheck(currentTurn, newBoard)) {
+      return false;
+    }
+
+    const newLastMove: [Position, Position] = [fromPos, toPos];
+
+    // check for pawn promotion
+    if (checkPawnPromotion(selectedPiece, toRow)) {
+      setBoard(newBoard);
+      setLastMove(newLastMove);
+      setPromotionPending({
+        position: toPos,
+        color: selectedPiece!.color,
+      });
+      return true;
+    }
+
+    // regular move completion
+    finalizeMoveWithBoard(newBoard, newLastMove);
     return true;
   };
 
@@ -267,6 +321,11 @@ export default function Chess() {
         <p>Checkmate! {currentTurn === "white" ? "black" : "white"} wins!</p>
       )}
       {stalemate && <p>Stalemate! It's a draw</p>}
+
+      {promotionPending && (
+        <PromotionModal color={currentTurn} handlePromotion={handlePromotion} />
+      )}
+
       <div className="controls">
         <button onClick={handleUndo} disabled={!canUndo}>
           Undo (←)
