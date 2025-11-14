@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 import {
   getLegalMoves,
@@ -23,7 +23,7 @@ import type {
 } from "../types/chess_types";
 
 import { initialBoard, testBoards } from "../game/boards";
-import { getPing } from "../api/chess";
+import { getBoard, postMove } from "../api/chess";
 
 export default function Chess() {
   const debugMode = true;
@@ -37,12 +37,36 @@ export default function Chess() {
   const [checkMate, setCheckmate] = useState(false);
   const [stalemate, setStalemate] = useState(false);
 
-  const { data, error } = useQuery({
-    queryKey: ["ping"],
-    queryFn: getPing,
+  // const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ["board"],
+    queryFn: getBoard,
   });
-  console.log(data);
-  console.log(error);
+
+  const moveMutation = useMutation({
+    mutationFn: postMove,
+    onSuccess: (data) => {
+      console.log(data);
+    },
+  });
+
+  const postData = () => {
+    moveMutation.mutate({
+      from_pos: { row: 6, col: 3 },
+      to_pos: { row: 4, col: 3 },
+      promotionPiece: undefined,
+    });
+  };
+
+  useEffect(() => {
+    if (!data) return;
+    console.log(data);
+
+    setBoard(data.board_data);
+  }, [data]);
+
+  useEffect(() => {});
 
   const [promotionPending, setPromotionPending] = useState<{
     position: Position;
@@ -252,6 +276,7 @@ export default function Chess() {
         <span style={{ marginLeft: "10px", color: "#666" }}>
           Move {historyIndex} / {history.length - 1}
         </span>
+        <button onClick={() => postData()}>Post Move</button>
       </div>
 
       <div className="game-container">

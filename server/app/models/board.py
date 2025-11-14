@@ -9,10 +9,14 @@ from app.models.piece import (
 class Board():
     """Represents the 8x8 chess board and piece placement."""
 
-    def __init__(self):
-        self.grid: List[List[Optional[Piece]]] = [
-            [None for _ in range(8)] for _ in range(8)
-        ]
+    def __init__(self, fen_string=None):
+        self.grid: List[List[Optional[Piece]]] = None
+        if fen_string:
+            self.grid = self.create_board_from_fen(fen_string)
+        else:
+            self.grid = [
+                [None for _ in range(8)] for _ in range(8)
+            ]
 
     def get_piece(self, pos: Position) -> Optional[Piece]:
         return self.grid[pos.row][pos.col]
