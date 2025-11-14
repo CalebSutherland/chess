@@ -49,6 +49,14 @@ def play_demo_game():
             break
         
         print("="*40 + "\n")
+        
+    print(game.get_move_list())
+    print("============ HISTORY TEST ============")
+    for status, board in game.game_history:
+        print(status)
+        print(board.display())
+        print("\n")
+
 
 def interactive_mode():
     """Interactive mode where you can play moves"""

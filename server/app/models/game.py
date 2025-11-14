@@ -1,4 +1,3 @@
-# app/models/game.py
 from typing import Optional, List
 from enum import Enum
 from app.models.board import Board
@@ -41,6 +40,9 @@ class Game:
         self.current_turn = Color.WHITE
         self.move_history: List[Move] = []
         self.status = GameStatus.ACTIVE
+        self.game_history: List[tuple[GameStatus, Board]] = [
+            (GameStatus.ACTIVE, self.board.clone())
+        ]
     
     @property
     def last_move(self) -> Optional[Move]:
@@ -133,6 +135,8 @@ class Game:
         
         # Update game status
         self._update_game_status()
+
+        self.game_history.append((self.status, self.board.clone()))
         
         return True
     
@@ -267,6 +271,15 @@ class Game:
     def is_check(self) -> bool:
         """Check if current player is in check"""
         return self.board.is_in_check(self.current_turn)
+    
+    def get_move_list(self) -> List[str]:
+        """Get moves in readable format"""
+        moves = []
+        for i, move in enumerate(self.move_history):
+            move_num = i // 2 + 1
+            color = "White" if i % 2 == 0 else "Black"
+            moves.append(f"{move_num}. {color}: {move}")
+        return moves
     
     def display(self) -> str:
         """Display the current game state"""
