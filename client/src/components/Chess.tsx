@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+
 import {
   generateMoves,
   isCheckmate,
@@ -21,6 +23,7 @@ import type {
 } from "../types/chess_types";
 
 import { initialBoard, testBoards } from "../game/boards";
+import { getPing } from "../api/chess";
 
 export default function Chess() {
   const debugMode = true;
@@ -33,6 +36,13 @@ export default function Chess() {
   const [inCheck, setInCheck] = useState<Color | null>(null);
   const [checkMate, setCheckmate] = useState(false);
   const [stalemate, setStalemate] = useState(false);
+
+  const { data, error } = useQuery({
+    queryKey: ["ping"],
+    queryFn: getPing,
+  });
+  console.log(data);
+  console.log(error);
 
   const [promotionPending, setPromotionPending] = useState<{
     position: Position;
@@ -50,10 +60,6 @@ export default function Chess() {
     },
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
-
-  useEffect(() => {
-    console.log(board);
-  }, [board]);
 
   const saveToHistory = (state: GameState) => {
     const newHistory = history.slice(0, historyIndex + 1);

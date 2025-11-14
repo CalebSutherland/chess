@@ -169,3 +169,15 @@ class Pawn(Piece):
                     moves.append(diag)
 
         return moves
+    
+    def get_attack_positions(self, pos: Position, board) -> List[Position]:
+        """Pawns attack diagonally even if square is empty"""
+        attacks = []
+        direction = -1 if self.color == Color.WHITE else 1
+        
+        for dc in (-1, 1):
+            diag = Position(pos.row + direction, pos.col + dc)
+            if diag.is_valid():
+                attacks.append(diag)
+        
+        return attacks

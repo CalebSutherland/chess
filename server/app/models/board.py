@@ -1,9 +1,9 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from copy import deepcopy
 
 from app.models.position import Position
 from app.models.piece import (
-    Piece, Color, King, Queen, Rook, Bishop, Knight, Pawn
+    Piece, PieceType, Color, King, Queen, Rook, Bishop, Knight, Pawn
 )
 
 class Board():
@@ -50,8 +50,12 @@ class Board():
         Returns True if 'pos' is attacked by any piece of attacker_color.
         """
         for piece_pos, piece in self.get_all_pieces(attacker_color):
-            moves = piece.get_possible_moves(piece_pos, self)
-            if pos in moves:
+            if isinstance(piece, Pawn):
+                attacks = piece.get_attack_positions(piece_pos, self)
+            else:
+                attacks = piece.get_possible_moves(piece_pos, self)
+            
+            if pos in attacks:
                 return True
         return False
     
@@ -75,29 +79,80 @@ class Board():
             attacker_color=color.opposite()
         )
     
+    def check_starting_square(self, piece: Piece, row: int, col: int) -> bool:
+        t = piece.piece_type
+        c = piece.color
+
+        if t == PieceType.PAWN:
+            return (c == Color.WHITE and row == 6) or (c == Color.BLACK and row == 1)
+
+        if t == PieceType.ROOK:
+            return (c == Color.WHITE and row == 7 and col in (0, 7)) or \
+                (c == Color.BLACK and row == 0 and col in (0, 7))
+
+        if t == PieceType.KNIGHT:
+            return (c == Color.WHITE and row == 7 and col in (1, 6)) or \
+                (c == Color.BLACK and row == 0 and col in (1, 6))
+
+        if t == PieceType.BISHOP:
+            return (c == Color.WHITE and row == 7 and col in (2, 5)) or \
+                (c == Color.BLACK and row == 0 and col in (2, 5))
+
+        if t == PieceType.QUEEN:
+            return (c == Color.WHITE and row == 7 and col == 3) or \
+                (c == Color.BLACK and row == 0 and col == 3)
+
+        if t == PieceType.KING:
+            return (c == Color.WHITE and row == 7 and col == 4) or \
+                (c == Color.BLACK and row == 0 and col == 4)
+
+        return False
+    
+    def create_board_from_fen(self, fen: str) -> List[List[Optional[Piece]]]:
+        rows = fen.split("/")
+        board: List[List[Optional[Piece]]] = [[None for _ in range(8)] for _ in range(8)]
+
+        fen_to_class = {
+            "p": Pawn, "r": Rook, "n": Knight, "b": Bishop,
+            "q": Queen, "k": King,
+            "P": Pawn, "R": Rook, "N": Knight, "B": Bishop,
+            "Q": Queen, "K": King,
+        }
+
+        fen_to_color = {
+            "p": Color.BLACK, "r": Color.BLACK, "n": Color.BLACK,
+            "b": Color.BLACK, "q": Color.BLACK, "k": Color.BLACK,
+            "P": Color.WHITE, "R": Color.WHITE, "N": Color.WHITE,
+            "B": Color.WHITE, "Q": Color.WHITE, "K": Color.WHITE,
+        }
+
+        for row_index, row in enumerate(rows):
+            col = 0
+
+            for char in row:
+                if char.isdigit():
+                    col += int(char)
+                else:
+                    if char not in fen_to_class:
+                        raise ValueError(f"Invalid FEN character: {char}")
+
+                    piece_class = fen_to_class[char]
+                    color = fen_to_color[char]
+
+                    # create correct subclass instance
+                    piece = piece_class(color=color)
+
+                    # set has_moved based on starting square
+                    piece.has_moved = not self.check_starting_square(piece, row_index, col)
+
+                    board[row_index][col] = piece
+                    col += 1
+
+        return board
+
     def setup_initial_position(self):
         """Set up the standard chess starting pieces."""
-
-        # Back ranks
-        for color, row_pieces, pawn_row in [
-            (Color.WHITE, 7, 6),
-            (Color.BLACK, 0, 1),
-        ]:
-            # Major pieces
-            self.grid[row_pieces] = [
-                Rook(color),
-                Knight(color),
-                Bishop(color),
-                Queen(color),
-                King(color),
-                Bishop(color),
-                Knight(color),
-                Rook(color),
-            ]
-
-            # Pawns
-            for col in range(8):
-                self.grid[pawn_row][col] = Pawn(color)
+        self.grid = self.create_board_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
 
     def display(self) -> str:
         """Return a text representation of the board."""
