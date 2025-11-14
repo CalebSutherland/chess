@@ -24,3 +24,9 @@ export type GameState = {
   checkMate: boolean;
   stalemate: boolean;
 };
+
+export type MoveResult = {
+  board: Board;
+  lastMove: [Position, Position];
+  promotionPending?: { position: Position; color: Color };
+};

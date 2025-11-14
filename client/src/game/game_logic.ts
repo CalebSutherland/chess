@@ -1,6 +1,7 @@
 import type {
   Board,
   Color,
+  MoveResult,
   Piece,
   PieceType,
   Position,
@@ -11,7 +12,7 @@ const isValidPosition = (row: number, col: number) => {
 };
 
 // checks what squares a piece attacks
-export const generateAttackMoves = (
+const generateAttackMoves = (
   row: number,
   col: number,
   piece: Piece,
@@ -206,6 +207,107 @@ export const generateMoves = (
       break;
   }
   return moves;
+};
+
+export const applyMoveEffects = (
+  board: Board,
+  from: Position,
+  to: Position,
+  currentTurn: Color
+): Board => {
+  const [fromRow, fromCol] = from;
+  const [toRow, toCol] = to;
+  const newBoard = board.map((r) => [...r]);
+
+  const movingPiece = newBoard[fromRow][fromCol];
+  newBoard[toRow][toCol] = { ...movingPiece!, hasMoved: true };
+  newBoard[fromRow][fromCol] = null;
+
+  // castling
+  if (movingPiece?.type === "king" && Math.abs(toCol - fromCol) === 2) {
+    const backRank = currentTurn === "white" ? 7 : 0;
+    if (toCol === 6) {
+      newBoard[backRank][5] = { ...board[backRank][7]!, hasMoved: true };
+      newBoard[backRank][7] = null;
+    } else if (toCol === 2) {
+      newBoard[backRank][3] = { ...board[backRank][0]!, hasMoved: true };
+      newBoard[backRank][0] = null;
+    }
+  }
+
+  // en passant )
+  if (
+    movingPiece?.type === "pawn" &&
+    Math.abs(toCol - fromCol) === 1 &&
+    !board[toRow][toCol]
+  ) {
+    newBoard[fromRow][toCol] = null;
+  }
+
+  return newBoard;
+};
+
+export const getLegalMoves = (
+  board: Board,
+  fromRow: number,
+  fromCol: number,
+  lastMove?: [Position, Position] | null,
+  currentTurn?: Color
+): Position[] => {
+  const piece = board[fromRow][fromCol];
+  if (!piece) return [];
+
+  const moves = generateMoves(fromRow, fromCol, piece, board, lastMove);
+
+  // filter out moves that leave own king in check
+  return moves.filter(([mr, mc]) => {
+    const testBoard = board.map((r) => [...r]);
+    const movingPiece = testBoard[fromRow][fromCol];
+    testBoard[mr][mc] = movingPiece;
+    testBoard[fromRow][fromCol] = null;
+
+    // handle en passant on test board
+    if (
+      movingPiece?.type === "pawn" &&
+      Math.abs(mc - fromCol) === 1 &&
+      !board[mr][mc]
+    ) {
+      testBoard[fromRow][mc] = null;
+    }
+
+    return !isInCheck(currentTurn ?? piece.color, testBoard);
+  });
+};
+
+export const makeMove = (
+  board: Board,
+  from: Position,
+  to: Position,
+  currentTurn: Color
+): MoveResult | { illegal: true } => {
+  const [fromRow] = from;
+  const movingPiece = board[fromRow][from[1]];
+  if (!movingPiece || movingPiece.color !== currentTurn)
+    return { illegal: true };
+
+  // apply effects
+  const newBoard = applyMoveEffects(board, from, to, currentTurn);
+
+  // verify move doesn't leave own king in check
+  if (isInCheck(currentTurn, newBoard)) return { illegal: true };
+
+  const newLastMove: [Position, Position] = [from, to];
+
+  // check promotion
+  if (shouldPromote(movingPiece, to[0], movingPiece.color)) {
+    return {
+      board: newBoard,
+      lastMove: newLastMove,
+      promotionPending: { position: to, color: movingPiece.color },
+    };
+  }
+
+  return { board: newBoard, lastMove: newLastMove };
 };
 
 export const isSquareUnderAttack = (

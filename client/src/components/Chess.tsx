@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import {
-  generateMoves,
+  getLegalMoves,
   isCheckmate,
   isInCheck,
   isStalemate,
+  makeMove,
   promotePawn,
 } from "../game/game_logic";
 import BoardDisplay from "./BoardDisplay";
@@ -17,7 +18,6 @@ import type {
   Board,
   Color,
   GameState,
-  Piece,
   PieceType,
   Position,
 } from "../types/chess_types";
@@ -100,48 +100,6 @@ export default function Chess() {
     }
   };
 
-  // handles castling and en passant
-  const applySpecialMoves = (
-    newBoard: Board,
-    selectedPiece: Piece | null,
-    fromRow: number,
-    fromCol: number,
-    toRow: number,
-    toCol: number
-  ) => {
-    // handle castling
-    if (selectedPiece?.type === "king" && Math.abs(toCol - fromCol) === 2) {
-      const backRank = currentTurn === "white" ? 7 : 0;
-
-      if (toCol === 6) {
-        // kingside
-        newBoard[backRank][5] = { ...board[backRank][7]!, hasMoved: true };
-        newBoard[backRank][7] = null;
-      } else if (toCol === 2) {
-        // queenside
-        newBoard[backRank][3] = { ...board[backRank][0]!, hasMoved: true };
-        newBoard[backRank][0] = null;
-      }
-    }
-
-    // handle en passant
-    if (
-      selectedPiece?.type === "pawn" &&
-      Math.abs(toCol - fromCol) === 1 &&
-      !board[toRow][toCol]
-    ) {
-      newBoard[fromRow][toCol] = null;
-    }
-  };
-
-  const checkPawnPromotion = (piece: Piece | null, toRow: number): boolean => {
-    if (piece?.type !== "pawn") return false;
-    return (
-      (piece.color === "white" && toRow === 0) ||
-      (piece.color === "black" && toRow === 7)
-    );
-  };
-
   const handlePromotion = (pieceType: PieceType) => {
     if (!promotionPending) return;
 
@@ -192,69 +150,8 @@ export default function Chess() {
     });
   };
 
-  const executeMove = (fromPos: Position, toPos: Position) => {
-    const [fromRow, fromCol] = fromPos;
-    const [toRow, toCol] = toPos;
-    const selectedPiece = board[fromRow][fromCol];
-
-    const newBoard = board.map((row) => [...row]);
-    newBoard[toRow][toCol] = { ...selectedPiece!, hasMoved: true };
-    newBoard[fromRow][fromCol] = null;
-
-    applySpecialMoves(newBoard, selectedPiece, fromRow, fromCol, toRow, toCol);
-
-    // make sure the move is legal
-    if (isInCheck(currentTurn, newBoard)) {
-      return false;
-    }
-
-    const newLastMove: [Position, Position] = [fromPos, toPos];
-
-    // check for pawn promotion
-    if (checkPawnPromotion(selectedPiece, toRow)) {
-      setBoard(newBoard);
-      setLastMove(newLastMove);
-      setPromotionPending({
-        position: toPos,
-        color: selectedPiece!.color,
-      });
-      return true;
-    }
-
-    // regular move completion
-    finalizeMoveWithBoard(newBoard, newLastMove);
-    return true;
-  };
-
-  const calculateLegalMoves = (row: number, col: number): Position[] => {
-    const piece = board[row][col];
-    if (!piece) return [];
-
-    const moves = generateMoves(row, col, piece, board, lastMove);
-
-    // filter out moves that would put own king in check
-    return moves.filter(([mr, mc]) => {
-      const testBoard = board.map((r) => [...r]);
-      const movingPiece = testBoard[row][col];
-      testBoard[mr][mc] = movingPiece;
-      testBoard[row][col] = null;
-
-      // handle en passant
-      if (
-        movingPiece?.type === "pawn" &&
-        Math.abs(mc - col) === 1 &&
-        !board[mr][mc]
-      ) {
-        testBoard[row][mc] = null;
-      }
-
-      return !isInCheck(currentTurn, testBoard);
-    });
-  };
-
   const handleSquareClick = (position: Position) => {
     if (checkMate || stalemate) return;
-
     const [row, col] = position;
 
     // if a piece is already selected check if its a valid move
@@ -262,7 +159,23 @@ export default function Chess() {
       selected &&
       validMoves?.some((move) => move[0] === row && move[1] === col)
     ) {
-      executeMove(selected, position);
+      const res = makeMove(board, selected, position, currentTurn);
+      if ("illegal" in res) {
+        // move was illegal (e.g. leaves king in check) — ignore
+        setSelected(null);
+        setValidMoves(null);
+        return;
+      }
+      if (res.promotionPending) {
+        setBoard(res.board);
+        setLastMove(res.lastMove);
+        setPromotionPending(res.promotionPending);
+        setSelected(null);
+        setValidMoves(null);
+        return;
+      }
+
+      finalizeMoveWithBoard(res.board, res.lastMove);
       setSelected(null);
       setValidMoves(null);
       return;
@@ -271,7 +184,7 @@ export default function Chess() {
     // if selecting a piece of the current turns color update the valid moves
     if (board[row][col]?.color === currentTurn) {
       setSelected(position);
-      setValidMoves(calculateLegalMoves(row, col));
+      setValidMoves(getLegalMoves(board, row, col, lastMove, currentTurn));
       return;
     }
 

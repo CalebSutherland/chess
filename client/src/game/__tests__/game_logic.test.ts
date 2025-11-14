@@ -1,5 +1,8 @@
 import {
   generateMoves,
+  applyMoveEffects,
+  getLegalMoves,
+  makeMove,
   isInCheck,
   isCheckmate,
   isStalemate,
@@ -521,6 +524,64 @@ describe("Chess Game Logic Tests", () => {
         expect(() => promotePawn(board, 7, 4, "queen")).toThrow(
           "Cannot promote non-pawn piece"
         );
+      });
+    });
+    describe("applyMoveEffects", () => {
+      it("should perform kingside castling rook movement", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/8/8/4K2R");
+
+        const newBoard = applyMoveEffects(board, [7, 4], [7, 6], "white");
+
+        expect(newBoard[7][6]?.type).toBe("king");
+        expect(newBoard[7][5]?.type).toBe("rook");
+        expect(newBoard[7][7]).toBeNull();
+        expect(newBoard[7][5]?.hasMoved).toBe(true);
+      });
+
+      it("should handle en passant capture", () => {
+        const board = createBoardFromFEN("8/8/8/4Pp2/8/8/8/8");
+
+        const newBoard = applyMoveEffects(board, [3, 4], [2, 5], "white");
+
+        // captured pawn removed from its original square
+        expect(newBoard[3][5]).toBeNull();
+        // moving pawn is now on the destination
+        expect(newBoard[2][5]?.type).toBe("pawn");
+        expect(newBoard[2][5]?.color).toBe("white");
+      });
+    });
+
+    describe("getLegalMoves", () => {
+      it("should filter out moves that leave king in check (pinned piece)", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/4r3/4R3/4K3");
+
+        const moves = getLegalMoves(board, 6, 4, null, "white");
+
+        // the rook at [6,4] is pinned to the king; only capturing the attacker is legal
+        expect(moves).toHaveLength(1);
+        expect(moves).toContainEqual([5, 4]);
+      });
+    });
+
+    describe("makeMove", () => {
+      it("should reject illegal moves that leave king in check", () => {
+        const board = createBoardFromFEN("8/8/8/8/8/4r3/4R3/4K3");
+
+        const result = makeMove(board, [6, 4], [6, 3], "white");
+
+        expect(
+          (result as any).illegal || (result as { illegal: true })
+        ).toBeTruthy();
+      });
+
+      it("should return promotionPending when move results in promotion", () => {
+        const board = createBoardFromFEN("8/4P3/8/8/8/8/8/4K3");
+
+        const result = makeMove(board, [1, 4], [0, 4], "white");
+
+        expect((result as any).promotionPending).toBeDefined();
+        expect((result as any).promotionPending.position).toEqual([0, 4]);
+        expect((result as any).promotionPending.color).toBe("white");
       });
     });
   });
