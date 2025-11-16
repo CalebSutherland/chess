@@ -12,6 +12,7 @@ import type {
 import type { GameHistory } from "./types";
 
 export class Game {
+  initialFEN: string;
   board: Board;
   currentTurn: Color;
   moveHistory: Move[];
@@ -19,9 +20,9 @@ export class Game {
   gameHistory: GameHistory[];
   currentHistoryIndex: number;
 
-  constructor() {
-    this.board = new Board();
-    this.board.setupInitialPosition();
+  constructor(fen: string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR") {
+    this.initialFEN = fen;
+    this.board = new Board(fen);
     this.currentTurn = "white";
     this.moveHistory = [];
     this.status = "active";
@@ -35,7 +36,8 @@ export class Game {
   }
 
   get lastMove(): Move | undefined {
-    return this.moveHistory[this.moveHistory.length - 1];
+    if (this.currentHistoryIndex === 0) return undefined;
+    return this.moveHistory[this.currentHistoryIndex - 1];
   }
 
   getLegalMoves(position: Position): Position[] {
@@ -131,14 +133,15 @@ export class Game {
     }
 
     this.currentTurn = this.currentTurn === "white" ? "black" : "white";
+    this.moveHistory.push(move);
+    this.gameHistory.push({ status: this.status, board: this.board.clone() });
+    this.currentHistoryIndex = this.gameHistory.length - 1;
+
     this.updateGameStatus();
 
     move.isCheck = this.board.isInCheck(this.currentTurn);
     move.isCheckmate = this.status === "checkmate";
-    this.moveHistory.push(move);
 
-    this.gameHistory.push({ status: this.status, board: this.board.clone() });
-    this.currentHistoryIndex = this.gameHistory.length - 1;
     return true;
   }
 
@@ -364,6 +367,20 @@ export class Game {
     } else {
       this.status = "active";
     }
+  }
+
+  resetGame() {
+    this.board = new Board(this.initialFEN);
+    this.currentTurn = "white";
+    this.moveHistory = [];
+    this.status = "active";
+    this.gameHistory = [
+      {
+        status: this.status,
+        board: this.board.clone(),
+      },
+    ];
+    this.currentHistoryIndex = 0;
   }
 
   isCheckmate(): boolean {

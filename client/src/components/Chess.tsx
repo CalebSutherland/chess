@@ -11,6 +11,9 @@ import { Position } from "../game/position";
 import type { PositionData, BoardData, PieceType } from "../types/chess_types";
 import "./Chess.css";
 
+import { testBoards } from "./testBoards";
+const DEBUG_MODE = true;
+
 export default function Chess() {
   const game = useRef(new Game());
 
@@ -119,6 +122,16 @@ export default function Chess() {
     handleJumpToMove(game.current.getTotalMoves());
   };
 
+  const handleReset = () => {
+    game.current.resetGame();
+    updateBoard();
+  };
+
+  const handleNewGame = (fen: string) => {
+    game.current = new Game(fen);
+    updateBoard();
+  };
+
   const currentTurn = game.current.currentTurn;
   const gameStatus = game.current.status;
   const canUndo = game.current.canUndo();
@@ -152,6 +165,8 @@ export default function Chess() {
         handleJumpToEnd={handleJumpToEnd}
       />
 
+      <button onClick={handleReset}>Reset</button>
+
       <div className="game-container">
         {promotionPending && (
           <PromotionModal
@@ -174,6 +189,12 @@ export default function Chess() {
           onMoveClick={handleJumpToMove}
         />
       </div>
+      {DEBUG_MODE &&
+        testBoards.map((b) => (
+          <button key={b.name} onClick={() => handleNewGame(b.board)}>
+            {b.name}
+          </button>
+        ))}
     </div>
   );
 }

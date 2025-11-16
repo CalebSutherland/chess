@@ -236,6 +236,13 @@ describe("Game", () => {
       game.makeMove(new Position(7, 0), new Position(0, 0));
       expect(game.lastMove?.isCheck).toBe(true);
     });
+
+    it("should not detect checkmate when only legal move is en passant", () => {
+      game.board = new Board("8/8/3ppp2/3pkp2/3pp3/8/PPPPPPPP/5Q2");
+      game.makeMove(new Position(6, 5), new Position(4, 5));
+
+      expect(game.isCheckmate()).toBe(false);
+    });
   });
 
   describe("undo and redo", () => {
