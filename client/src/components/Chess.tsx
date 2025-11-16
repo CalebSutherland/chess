@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 import BoardDisplay from "./BoardDisplay";
 import PromotionModal from "./PromotionModal";
@@ -149,6 +149,25 @@ export default function Chess() {
   const inCheck = game.current.isCheck()
     ? game.current.board.findKing(currentTurn).serializePosition()
     : null;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Left arrow = undo
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        handleUndo();
+      }
+
+      // Right arrow = redo
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
 
   return (
     <div className="chess">

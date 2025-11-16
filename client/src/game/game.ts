@@ -19,8 +19,12 @@ export class Game {
   status: GameStatus;
   gameHistory: GameHistory[];
   currentHistoryIndex: number;
+  viewOnlyMode: boolean;
 
-  constructor(fen: string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR") {
+  constructor(
+    fen: string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+    viewOnlyMode: boolean = false
+  ) {
     this.initialFEN = fen;
     this.board = new Board(fen);
     this.currentTurn = "white";
@@ -33,6 +37,7 @@ export class Game {
       },
     ];
     this.currentHistoryIndex = 0;
+    this.viewOnlyMode = viewOnlyMode;
   }
 
   get lastMove(): Move | undefined {
@@ -40,7 +45,16 @@ export class Game {
     return this.moveHistory[this.currentHistoryIndex - 1];
   }
 
+  // check if moves can be made in the current state
+  canMakeMove(): boolean {
+    if (!this.viewOnlyMode) return true;
+    return this.isAtCurrentPosition();
+  }
+
   getLegalMoves(position: Position): Position[] {
+    // if in view-only mode and not at current position return empty array
+    if (!this.canMakeMove()) return [];
+
     const piece = this.board.getPiece(position);
     if (!piece || piece.color !== this.currentTurn) return [];
 
@@ -84,6 +98,8 @@ export class Game {
     toPos: Position,
     promotionPiece?: PieceType
   ): boolean {
+    if (!this.canMakeMove()) return false;
+
     const piece = this.board.getPiece(fromPos);
     if (!piece || piece.color !== this.currentTurn) return false;
 
@@ -192,6 +208,14 @@ export class Game {
   getCurrentMove(): Move | null {
     if (this.currentHistoryIndex === 0) return null;
     return this.moveHistory[this.currentHistoryIndex - 1];
+  }
+
+  setViewOnlyMode(enabled: boolean): void {
+    this.viewOnlyMode = enabled;
+  }
+
+  isViewOnlyMode(): boolean {
+    return this.viewOnlyMode;
   }
 
   private getCastlingMoves(kingPos: Position): Position[] {
@@ -412,6 +436,13 @@ export class Game {
     lines.push(`Status: ${this.status}`);
     if (this.isCheck()) lines.push("CHECK!");
     lines.push(`Move: ${this.currentHistoryIndex}/${this.getTotalMoves()}`);
+
+    if (!this.isAtCurrentPosition() && this.viewOnlyMode) {
+      lines.push(
+        "(Viewing history - return to current position to make moves)"
+      );
+    }
+
     return lines.join("\n");
   }
 }
