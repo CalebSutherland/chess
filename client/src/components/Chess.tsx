@@ -6,19 +6,23 @@ import MoveHistory from "./MoveHistory";
 import MoveControls from "./MoveControls";
 
 import { Game } from "../game/game";
+import { GameStateManager } from "../game/gameStateManager";
+// import { GameSerializer } from "../game/gameSerializer";
 import { Position } from "../game/position";
 
 import type { PositionData, BoardData, PieceType } from "../types/chess_types";
+// import type { GameStateDTO } from "../game/types";
 import "./Chess.css";
 
 import { testBoards } from "./testBoards";
 const DEBUG_MODE = true;
 
 export default function Chess() {
-  const game = useRef(new Game());
+  // Use GameStateManager instead of direct Game access
+  const gameManager = useRef(new GameStateManager(new Game()));
 
   const [board, setBoard] = useState<BoardData>(() =>
-    game.current.board.serializeBoard()
+    gameManager.current.getGame().Board.serializeBoard()
   );
   const [selected, setSelected] = useState<PositionData | null>(null);
   const [validMoves, setValidMoves] = useState<PositionData[] | null>(null);
@@ -27,14 +31,19 @@ export default function Chess() {
     to: Position;
   } | null>(null);
 
+  // For future multiplayer - track if we're in sync with server
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const game = gameManager.current.getGame();
+
   const updateBoard = () => {
-    setBoard(game.current.board.serializeBoard());
+    setBoard(game.Board.serializeBoard());
     setSelected(null);
     setValidMoves(null);
   };
 
   const handleSquareClick = (position: PositionData) => {
-    if (game.current.status !== "active") return;
+    if (game.Status !== "active") return;
     const { row, col } = position;
     const to_pos = new Position(position.row, position.col);
 
@@ -44,38 +53,40 @@ export default function Chess() {
       validMoves?.some((move) => move.row === row && move.col === col)
     ) {
       const from_pos = new Position(selected.row, selected.col);
-      const piece = game.current.board.getPiece(from_pos);
+      const piece = game.Board.getPiece(from_pos);
 
       if (piece?.pieceType === "pawn") {
         const promotionRow = piece.color === "white" ? 0 : 7;
         if (to_pos.row === promotionRow) {
-          // show promotion modal instead of making the move
           setPromotionPending({ from: from_pos, to: to_pos });
           return;
         }
       }
 
-      const result = game.current.makeMove(from_pos, to_pos);
-      if (!result) {
-        // move was illegal
+      // Use GameStateManager for moves (makes it easier to add networking later)
+      const response = gameManager.current.makeMove(from_pos, to_pos);
+      if (!response.success) {
         setSelected(null);
         setValidMoves(null);
         return;
       }
+
+      // For future multiplayer: send move to server here
+      // await sendMoveToServer(response.gameState);
 
       updateBoard();
       return;
     }
 
     // if selecting a piece of the current turns color update the valid moves
-    if (board[row][col]?.color === game.current.currentTurn) {
+    if (board[row][col]?.color === game.CurrentTurn) {
       setSelected(position);
-      const validMoves = game.current.serializeLegalMoves(to_pos);
-      setValidMoves(validMoves);
+      // Use manager's getLegalMoves (returns plain objects)
+      const moves = gameManager.current.getLegalMoves(to_pos);
+      setValidMoves(moves);
       return;
     }
 
-    // otherwise deselect current piece
     setSelected(null);
     setValidMoves(null);
   };
@@ -83,13 +94,13 @@ export default function Chess() {
   const handlePromotion = (pieceType: PieceType) => {
     if (!promotionPending) return;
 
-    const result = game.current.makeMove(
+    const response = gameManager.current.makeMove(
       promotionPending.from,
       promotionPending.to,
       pieceType
     );
 
-    if (result) {
+    if (response.success) {
       updateBoard();
     }
 
@@ -97,19 +108,19 @@ export default function Chess() {
   };
 
   const handleUndo = () => {
-    if (game.current.undo()) {
+    if (game.undo()) {
       updateBoard();
     }
   };
 
   const handleRedo = () => {
-    if (game.current.redo()) {
+    if (game.redo()) {
       updateBoard();
     }
   };
 
   const handleJumpToMove = (index: number) => {
-    if (game.current.jumpToMove(index)) {
+    if (game.jumpToMove(index)) {
       updateBoard();
     }
   };
@@ -119,25 +130,59 @@ export default function Chess() {
   };
 
   const handleJumpToEnd = () => {
-    handleJumpToMove(game.current.getTotalMoves());
+    handleJumpToMove(game.getTotalMoves());
   };
 
   const handleReset = () => {
-    game.current.resetGame();
+    game.resetGame();
     updateBoard();
   };
 
   const handleNewGame = (fen: string) => {
-    game.current = new Game(fen);
+    gameManager.current = new GameStateManager(new Game(fen));
     updateBoard();
   };
 
-  const currentTurn = game.current.currentTurn;
-  const gameStatus = game.current.status;
-  const canUndo = game.current.canUndo();
-  const canRedo = game.current.canRedo();
-  const currentMoveIndex = game.current.getCurrentMoveNumber();
-  const currentMove = game.current.getCurrentMove();
+  // New: Export game state (useful for saving/sharing games)
+  const handleExportGame = () => {
+    const gameState = gameManager.current.getState();
+    const json = JSON.stringify(gameState, null, 2);
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(json);
+    console.log("Game state copied to clipboard:", gameState);
+  };
+
+  // // New: Import game state (useful for loading saved games)
+  // const handleImportGame = (gameStateDTO: GameStateDTO) => {
+  //   const newGame = GameSerializer.deserializeGame(gameStateDTO);
+  //   gameManager.current = new GameStateManager(newGame);
+  //   updateBoard();
+  // };
+
+  // New: Simulate receiving game state from server
+  const handleSyncWithServer = async () => {
+    setIsSyncing(true);
+
+    // In real multiplayer, you'd fetch from server:
+    // const gameState = await fetchGameState(gameId);
+
+    // For demo, just use current state
+    const gameState = gameManager.current.getState();
+
+    // Apply the state
+    gameManager.current.applyRemoteState(gameState);
+    updateBoard();
+
+    setIsSyncing(false);
+  };
+
+  const currentTurn = game.CurrentTurn;
+  const gameStatus = game.Status;
+  const canUndo = game.canUndo();
+  const canRedo = game.canRedo();
+  const currentMoveIndex = game.getCurrentMoveNumber();
+  const currentMove = game.getCurrentMove();
 
   const lastMove = currentMove
     ? {
@@ -146,19 +191,16 @@ export default function Chess() {
       }
     : null;
 
-  const inCheck = game.current.isCheck()
-    ? game.current.board.findKing(currentTurn).serializePosition()
+  const inCheck = game.isCheck()
+    ? game.Board.findKing(currentTurn).serializePosition()
     : null;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Left arrow = undo
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         handleUndo();
       }
-
-      // Right arrow = redo
       if (e.key === "ArrowRight") {
         e.preventDefault();
         handleRedo();
@@ -177,14 +219,20 @@ export default function Chess() {
         canRedo={canRedo}
         canUndo={canUndo}
         currentMoveIndex={currentMoveIndex}
-        totalMoves={game.current.getTotalMoves()}
+        totalMoves={game.getTotalMoves()}
         handleRedo={handleRedo}
         handleUndo={handleUndo}
         handleJumpToStart={handleJumpToStart}
         handleJumpToEnd={handleJumpToEnd}
       />
 
-      <button onClick={handleReset}>Reset</button>
+      <div className="button-group">
+        <button onClick={handleReset}>Reset</button>
+        <button onClick={handleExportGame}>Export Game</button>
+        <button onClick={handleSyncWithServer} disabled={isSyncing}>
+          {isSyncing ? "Syncing..." : "Sync State"}
+        </button>
+      </div>
 
       <div className="game-container">
         {promotionPending && (
@@ -203,17 +251,21 @@ export default function Chess() {
           handleSquareClick={handleSquareClick}
         />
         <MoveHistory
-          moves={game.current.getMoveList()}
+          moves={game.getMoveList()}
           historyIndex={currentMoveIndex}
           onMoveClick={handleJumpToMove}
         />
       </div>
-      {DEBUG_MODE &&
-        testBoards.map((b) => (
-          <button key={b.name} onClick={() => handleNewGame(b.board)}>
-            {b.name}
-          </button>
-        ))}
+
+      {DEBUG_MODE && (
+        <>
+          {testBoards.map((b) => (
+            <button key={b.name} onClick={() => handleNewGame(b.board)}>
+              {b.name}
+            </button>
+          ))}
+        </>
+      )}
     </div>
   );
 }
