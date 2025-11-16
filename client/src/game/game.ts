@@ -348,7 +348,7 @@ export class Game {
     }
   }
 
-  private updateGameStatus() {
+  updateGameStatus() {
     let hasLegalMoves = false;
     for (const [pos] of this.board.getAllPieces(this.currentTurn)) {
       if (this.getLegalMoves(pos).length > 0) {
