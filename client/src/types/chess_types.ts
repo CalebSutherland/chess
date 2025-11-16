@@ -1,3 +1,13 @@
+export type PositionData = {
+  row: number;
+  col: number;
+};
+
+export type MoveData = {
+  from_pos: PositionData;
+  to_pos: PositionData;
+};
+
 export type PieceType =
   | "king"
   | "queen"
@@ -6,27 +16,16 @@ export type PieceType =
   | "knight"
   | "pawn";
 export type Color = "white" | "black";
+export type GameStatus = "active" | "checkmate" | "stalemate" | "draw";
 
-export interface Piece {
+export type PieceData = {
   type: PieceType;
   color: Color;
   hasMoved: boolean;
-}
-
-export type Board = (Piece | null)[][];
-export type Position = [number, number];
-
-export type GameState = {
-  board: Board;
-  lastMove: [Position, Position] | null;
-  currentTurn: Color;
-  inCheck: Color | null;
-  checkMate: boolean;
-  stalemate: boolean;
 };
+export type BoardData = (PieceData | null)[][];
 
-export type MoveResult = {
-  board: Board;
-  lastMove: [Position, Position];
-  promotionPending?: { position: Position; color: Color };
+export type HistoryData = {
+  status: GameStatus;
+  board: BoardData;
 };

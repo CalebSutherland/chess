@@ -1,19 +1,23 @@
-import { getMovePairs } from "../game/san";
-import type { GameState } from "../types/chess_types";
-import "./History.css";
+import "./MoveHistory.css";
 
 interface MoveHistoryProps {
-  history: GameState[];
+  moves: string[];
   historyIndex: number;
   onMoveClick: (index: number) => void;
 }
-
-export default function History({
-  history,
+export default function MoveHistory({
+  moves,
   historyIndex,
   onMoveClick,
 }: MoveHistoryProps) {
-  const movePairs = getMovePairs(history);
+  const movePairs = [];
+  for (let i = 0; i < moves.length; i += 2) {
+    movePairs.push({
+      moveNumber: i / 2 + 1,
+      white: moves[i],
+      black: moves[i + 1] ?? null,
+    });
+  }
 
   return (
     <div>
@@ -26,6 +30,7 @@ export default function History({
             <div key={pair.moveNumber} className="move-pair">
               <span className="move-number">{pair.moveNumber}.</span>
 
+              {/* White move */}
               <button
                 className={`move-button ${
                   historyIndex === whiteMoveIndex ? "active" : ""
@@ -35,6 +40,7 @@ export default function History({
                 {pair.white}
               </button>
 
+              {/* Black move (if exists) */}
               {pair.black && (
                 <button
                   className={`move-button ${

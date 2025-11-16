@@ -1,214 +1,74 @@
-import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useRef } from "react";
 
-import {
-  getLegalMoves,
-  isCheckmate,
-  isInCheck,
-  isStalemate,
-  makeMove,
-  promotePawn,
-} from "../game/game_logic";
 import BoardDisplay from "./BoardDisplay";
 import PromotionModal from "./PromotionModal";
-import History from "./History";
+import MoveHistory from "./MoveHistory";
+import MoveControls from "./MoveControls";
+
+import { Game } from "../game/game";
+import { Position } from "../game/position";
+
+import type { PositionData, BoardData, PieceType } from "../types/chess_types";
 import "./Chess.css";
 
-import type {
-  Board,
-  Color,
-  GameState,
-  PieceType,
-  Position,
-} from "../types/chess_types";
-
-import { initialBoard, testBoards } from "../game/boards";
-import { getBoard, postMove } from "../api/chess";
-
 export default function Chess() {
-  const debugMode = true;
+  const game = useRef(new Game());
 
-  const [board, setBoard] = useState<Board>(initialBoard);
-  const [selected, setSelected] = useState<Position | null>(null);
-  const [validMoves, setValidMoves] = useState<Position[] | null>(null);
-  const [lastMove, setLastMove] = useState<[Position, Position] | null>(null);
-  const [currentTurn, setCurrentTurn] = useState<Color>("white");
-  const [inCheck, setInCheck] = useState<Color | null>(null);
-  const [checkMate, setCheckmate] = useState(false);
-  const [stalemate, setStalemate] = useState(false);
-
-  // const queryClient = useQueryClient();
-
-  const { data } = useQuery({
-    queryKey: ["board"],
-    queryFn: getBoard,
-  });
-
-  const moveMutation = useMutation({
-    mutationFn: postMove,
-    onSuccess: (data) => {
-      console.log(data);
-    },
-  });
-
-  const postData = () => {
-    moveMutation.mutate({
-      from_pos: { row: 6, col: 3 },
-      to_pos: { row: 4, col: 3 },
-      promotionPiece: undefined,
-    });
-  };
-
-  useEffect(() => {
-    if (!data) return;
-    console.log(data);
-
-    setBoard(data.board_data);
-  }, [data]);
-
-  useEffect(() => {});
-
+  const [board, setBoard] = useState<BoardData>(() =>
+    game.current.board.serializeBoard()
+  );
+  const [selected, setSelected] = useState<PositionData | null>(null);
+  const [validMoves, setValidMoves] = useState<PositionData[] | null>(null);
   const [promotionPending, setPromotionPending] = useState<{
-    position: Position;
-    color: Color;
+    from: Position;
+    to: Position;
   } | null>(null);
 
-  const [history, setHistory] = useState<GameState[]>([
-    {
-      board: initialBoard,
-      lastMove: null,
-      currentTurn: "white",
-      inCheck: null,
-      checkMate: false,
-      stalemate: false,
-    },
-  ]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-
-  const saveToHistory = (state: GameState) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(state);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
-  const restoreState = (state: GameState) => {
-    setBoard(state.board);
-    setLastMove(state.lastMove);
-    setCurrentTurn(state.currentTurn);
-    setInCheck(state.inCheck);
-    setCheckmate(state.checkMate);
-    setStalemate(state.stalemate);
+  const updateBoard = () => {
+    setBoard(game.current.board.serializeBoard());
     setSelected(null);
     setValidMoves(null);
   };
 
-  const jumpToMove = (index: number) => {
-    setHistoryIndex(index);
-    restoreState(history[index]);
-  };
-
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      restoreState(history[newIndex]);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      restoreState(history[newIndex]);
-    }
-  };
-
-  const handlePromotion = (pieceType: PieceType) => {
-    if (!promotionPending) return;
-
-    const { position } = promotionPending;
-    const [row, col] = position;
-
-    const newBoard = promotePawn(board, row, col, pieceType);
-
-    finalizeMoveWithBoard(newBoard, lastMove!);
-    setPromotionPending(null);
-  };
-
-  const finalizeMoveWithBoard = (
-    newBoard: Board,
-    newLastMove: [Position, Position]
-  ) => {
-    const nextTurn = currentTurn === "white" ? "black" : "white";
-
-    let newInCheck: Color | null = null;
-    let newCheckmate = false;
-    let newStalemate = false;
-
-    if (isInCheck(nextTurn, newBoard)) {
-      newInCheck = nextTurn;
-      if (isCheckmate(nextTurn, newBoard, newLastMove)) {
-        newCheckmate = true;
-      }
-    } else {
-      if (isStalemate(nextTurn, newBoard, newLastMove)) {
-        newStalemate = true;
-      }
-    }
-
-    setBoard(newBoard);
-    setLastMove(newLastMove);
-    setCurrentTurn(nextTurn);
-    setInCheck(newInCheck);
-    setCheckmate(newCheckmate);
-    setStalemate(newStalemate);
-
-    saveToHistory({
-      board: newBoard,
-      lastMove: newLastMove,
-      currentTurn: nextTurn,
-      inCheck: newInCheck,
-      checkMate: newCheckmate,
-      stalemate: newStalemate,
-    });
-  };
-
-  const handleSquareClick = (position: Position) => {
-    if (checkMate || stalemate) return;
-    const [row, col] = position;
+  const handleSquareClick = (position: PositionData) => {
+    if (game.current.status !== "active") return;
+    const { row, col } = position;
+    const to_pos = new Position(position.row, position.col);
 
     // if a piece is already selected check if its a valid move
     if (
       selected &&
-      validMoves?.some((move) => move[0] === row && move[1] === col)
+      validMoves?.some((move) => move.row === row && move.col === col)
     ) {
-      const res = makeMove(board, selected, position, currentTurn);
-      if ("illegal" in res) {
-        // move was illegal (e.g. leaves king in check) — ignore
-        setSelected(null);
-        setValidMoves(null);
-        return;
+      const from_pos = new Position(selected.row, selected.col);
+      const piece = game.current.board.getPiece(from_pos);
+
+      if (piece?.pieceType === "pawn") {
+        const promotionRow = piece.color === "white" ? 0 : 7;
+        if (to_pos.row === promotionRow) {
+          // show promotion modal instead of making the move
+          setPromotionPending({ from: from_pos, to: to_pos });
+          return;
+        }
       }
-      if (res.promotionPending) {
-        setBoard(res.board);
-        setLastMove(res.lastMove);
-        setPromotionPending(res.promotionPending);
+
+      const result = game.current.makeMove(from_pos, to_pos);
+      if (!result) {
+        // move was illegal
         setSelected(null);
         setValidMoves(null);
         return;
       }
 
-      finalizeMoveWithBoard(res.board, res.lastMove);
-      setSelected(null);
-      setValidMoves(null);
+      updateBoard();
       return;
     }
 
     // if selecting a piece of the current turns color update the valid moves
-    if (board[row][col]?.color === currentTurn) {
+    if (board[row][col]?.color === game.current.currentTurn) {
       setSelected(position);
-      setValidMoves(getLegalMoves(board, row, col, lastMove, currentTurn));
+      const validMoves = game.current.serializeLegalMoves(to_pos);
+      setValidMoves(validMoves);
       return;
     }
 
@@ -217,67 +77,80 @@ export default function Chess() {
     setValidMoves(null);
   };
 
-  const resetGame = (newBoard = initialBoard) => {
-    const initialState: GameState = {
-      board: newBoard,
-      lastMove: null,
-      currentTurn: "white",
-      inCheck: null,
-      checkMate: false,
-      stalemate: false,
-    };
+  const handlePromotion = (pieceType: PieceType) => {
+    if (!promotionPending) return;
 
-    setBoard(newBoard);
-    setCheckmate(false);
-    setStalemate(false);
-    setCurrentTurn("white");
-    setValidMoves(null);
-    setLastMove(null);
-    setSelected(null);
-    setInCheck(null);
+    const result = game.current.makeMove(
+      promotionPending.from,
+      promotionPending.to,
+      pieceType
+    );
 
-    setHistory([initialState]);
-    setHistoryIndex(0);
+    if (result) {
+      updateBoard();
+    }
+
+    setPromotionPending(null);
   };
 
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < history.length - 1;
+  const handleUndo = () => {
+    if (game.current.undo()) {
+      updateBoard();
+    }
+  };
 
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" && canUndo) {
-        handleUndo();
-      } else if (e.key === "ArrowRight" && canRedo) {
-        handleRedo();
+  const handleRedo = () => {
+    if (game.current.redo()) {
+      updateBoard();
+    }
+  };
+
+  const handleJumpToMove = (index: number) => {
+    if (game.current.jumpToMove(index)) {
+      updateBoard();
+    }
+  };
+
+  const handleJumpToStart = () => {
+    handleJumpToMove(0);
+  };
+
+  const handleJumpToEnd = () => {
+    handleJumpToMove(game.current.getTotalMoves());
+  };
+
+  const currentTurn = game.current.currentTurn;
+  const gameStatus = game.current.status;
+  const canUndo = game.current.canUndo();
+  const canRedo = game.current.canRedo();
+  const currentMoveIndex = game.current.getCurrentMoveNumber();
+  const currentMove = game.current.getCurrentMove();
+
+  const lastMove = currentMove
+    ? {
+        from_pos: currentMove.fromPos.serializePosition(),
+        to_pos: currentMove.toPos.serializePosition(),
       }
-    };
+    : null;
 
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [canUndo, canRedo, historyIndex]);
+  const inCheck = game.current.isCheck()
+    ? game.current.board.findKing(currentTurn).serializePosition()
+    : null;
 
   return (
     <div className="chess">
-      <p>Turn: {currentTurn}</p>
-      <p>Check: {inCheck}</p>
-      {checkMate && (
-        <p>Checkmate! {currentTurn === "white" ? "black" : "white"} wins!</p>
-      )}
-      {stalemate && <p>Stalemate! It's a draw</p>}
-
-      <div className="controls">
-        <button onClick={handleUndo} disabled={!canUndo}>
-          Undo (←)
-        </button>
-        <button onClick={handleRedo} disabled={!canRedo}>
-          Redo (→)
-        </button>
-        <button onClick={() => resetGame()}>Reset Game</button>
-        <span style={{ marginLeft: "10px", color: "#666" }}>
-          Move {historyIndex} / {history.length - 1}
-        </span>
-        <button onClick={() => postData()}>Post Move</button>
-      </div>
+      <MoveControls
+        gameStatus={gameStatus}
+        currentTurn={currentTurn}
+        canRedo={canRedo}
+        canUndo={canUndo}
+        currentMoveIndex={currentMoveIndex}
+        totalMoves={game.current.getTotalMoves()}
+        handleRedo={handleRedo}
+        handleUndo={handleUndo}
+        handleJumpToStart={handleJumpToStart}
+        handleJumpToEnd={handleJumpToEnd}
+      />
 
       <div className="game-container">
         {promotionPending && (
@@ -292,28 +165,15 @@ export default function Chess() {
           selected={selected}
           validMoves={validMoves}
           lastMove={lastMove}
-          currentTurn={currentTurn}
           inCheck={inCheck}
           handleSquareClick={handleSquareClick}
         />
-        <History
-          history={history}
-          historyIndex={historyIndex}
-          onMoveClick={jumpToMove}
+        <MoveHistory
+          moves={game.current.getMoveList()}
+          historyIndex={currentMoveIndex}
+          onMoveClick={handleJumpToMove}
         />
       </div>
-
-      {debugMode &&
-        testBoards.map((test) => (
-          <button
-            key={test.name}
-            onClick={() => {
-              resetGame(test.board);
-            }}
-          >
-            {test.name}
-          </button>
-        ))}
     </div>
   );
 }
